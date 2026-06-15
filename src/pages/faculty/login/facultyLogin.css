@@ -1,0 +1,196 @@
+.faculty-login-page {
+  min-height: 100vh;
+  overflow: hidden;
+  background: #f4f4f7;
+  color: #111827;
+  font-family: "Inter", "Poppins", "Manrope", system-ui, sans-serif;
+}
+
+.faculty-login-nav {
+  height: 63px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 23px 0 63px;
+  border-top: 4px solid #0a0a0a;
+  border-bottom: 1px solid #dfe3ea;
+  background: #ffffff;
+}
+
+.faculty-login-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.faculty-login-brand span {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #2024c7;
+  color: #ffffff;
+}
+
+.faculty-login-brand strong {
+  color: #111827;
+  font-size: 23px;
+  font-weight: 900;
+}
+
+.faculty-login-nav > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+}
+
+.faculty-login-nav a {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.faculty-login-nav button {
+  width: 89px;
+  height: 33px;
+  border: 0;
+  border-radius: 7px;
+  background: #2024c7;
+  color: #ffffff;
+  box-shadow: 0 7px 11px rgba(32, 36, 199, 0.24);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.faculty-login-card {
+  width: min(638px, calc(100% - 32px));
+  margin: 74px auto 0;
+  padding: 58px 53px 40px;
+  border-radius: 19px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.faculty-login-card h1 {
+  max-width: 430px;
+  margin: 0 auto;
+  color: #111827;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.22;
+  text-align: center;
+}
+
+.faculty-login-card > p {
+  margin: 16px 0 45px;
+  color: #64748b;
+  font-size: 18px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.faculty-login-tab {
+  padding-bottom: 23px;
+  border-bottom: 3px solid #2024c7;
+  color: #2024c7;
+  font-size: 18px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.faculty-login-card form {
+  display: grid;
+  gap: 26px;
+  padding-top: 47px;
+}
+
+.faculty-login-field {
+  display: grid;
+  gap: 12px;
+}
+
+.faculty-login-field > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #334155;
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.faculty-login-field a {
+  color: #2024c7;
+  font-size: 15px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.faculty-login-field div {
+  height: 61px;
+  display: flex;
+  align-items: center;
+  gap: 21px;
+  padding: 0 17px;
+  border-radius: 11px;
+  background: #f6f8fb;
+  color: #8ca0bb;
+}
+
+.faculty-login-field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #5b6574;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.faculty-login-field input::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.faculty-login-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.faculty-login-remember input {
+  width: 23px;
+  height: 23px;
+  appearance: none;
+  border: 0;
+  border-radius: 5px;
+  background: #f0f3f8;
+}
+
+.faculty-login-card form > button {
+  height: 72px;
+  border: 0;
+  border-radius: 10px;
+  background: #2024c7;
+  color: #ffffff;
+  box-shadow: 0 12px 18px rgba(32, 36, 199, 0.3);
+  font-size: 22px;
+  font-weight: 900;
+}
+
+@media (max-width: 680px) {
+  .faculty-login-nav {
+    padding: 0 18px;
+  }
+
+  .faculty-login-card {
+    margin-top: 36px;
+    padding: 36px 24px 30px;
+  }
+}

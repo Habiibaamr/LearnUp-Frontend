@@ -1,0 +1,131 @@
+.admin-login-page {
+  min-height: 100vh;
+  background: #f4f4f7;
+  color: #111827;
+  font-family: "Inter", "Poppins", "Manrope", system-ui, sans-serif;
+}
+
+.admin-login-nav {
+  height: 53px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 51px;
+  border-bottom: 1px solid #dfe3ea;
+  background: #ffffff;
+}
+
+.admin-login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-login-brand span {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #2024c7;
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.admin-login-brand strong {
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.admin-login-nav button {
+  width: 82px;
+  height: 31px;
+  border: 0;
+  border-radius: 6px;
+  background: #2024c7;
+  color: #ffffff;
+  box-shadow: 0 5px 9px rgba(32, 36, 199, 0.26);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-login-card {
+  width: min(520px, calc(100% - 32px));
+  margin: 96px auto 0;
+  padding: 39px 39px 34px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.08);
+}
+
+.admin-login-card h1 {
+  text-align: center;
+  color: #111827;
+  font-size: 31px;
+  font-weight: 900;
+}
+
+.admin-login-card > p {
+  max-width: 330px;
+  margin: 13px auto 40px;
+  color: #586782;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.admin-login-card form {
+  display: grid;
+  gap: 23px;
+}
+
+.admin-login-card label {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-login-card label > span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.admin-login-card label a {
+  margin-left: auto;
+  color: #111bd1;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-login-card input {
+  height: 52px;
+  border: 1px solid #d9dfeb;
+  border-radius: 7px;
+  outline: 0;
+  padding: 0 16px;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 550;
+}
+
+.admin-login-card form > button {
+  height: 55px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 1px;
+  border: 0;
+  border-radius: 7px;
+  background: #2024c7;
+  color: #ffffff;
+  box-shadow: 0 12px 18px rgba(32, 36, 199, 0.3);
+  font-size: 17px;
+  font-weight: 900;
+}

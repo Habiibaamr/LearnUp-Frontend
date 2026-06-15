@@ -1,0 +1,374 @@
+.register-page {
+  min-height: 100vh;
+  background: #f6f7fb;
+  color: #1c2942;
+}
+
+.register-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 38px 0 40px;
+  border-bottom: 1px solid #e8ebf3;
+  background: #ffffff;
+}
+
+.register-page__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.register-page__brand .learnup-logo {
+  width: 58px;
+  height: 58px;
+}
+
+.register-page__brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: #2027c9;
+}
+
+.register-page__brand-badge-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.register-page__brand-name {
+  font-family: "Outfit", sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #1c2942;
+}
+
+.register-page__header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.register-page__help,
+.register-page__join {
+  border: 0;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+}
+
+.register-page__help {
+  padding: 0;
+  color: #53617f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.register-page__join {
+  min-width: 82px;
+  height: 33px;
+  padding: 0 14px;
+  border-radius: 7px;
+  background: #2027c9;
+  box-shadow: 0 10px 18px rgba(32, 39, 201, 0.14);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.register-page__main {
+  display: flex;
+  justify-content: center;
+  padding: 48px 20px 72px;
+}
+
+.register-card {
+  width: min(520px, 100%);
+  padding: 46px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 14px 40px rgba(26, 37, 74, 0.08);
+}
+
+.register-card__intro {
+  display: grid;
+  gap: 10px;
+  text-align: center;
+}
+
+.register-card__intro h1 {
+  font-family: "Outfit", sans-serif;
+  font-size: 23px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #18253f;
+}
+
+.register-card__intro p {
+  font-size: 14px;
+  font-weight: 600;
+  color: #8994ab;
+}
+
+.register-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 90px;
+  align-items: center;
+  margin-top: 28px;
+  border-bottom: 1px solid #eceef5;
+}
+
+.register-tabs__tab {
+  position: relative;
+  border: 0;
+  padding: 0 0 10px;
+  background: transparent;
+  color: #9aa5b8;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.register-tabs__tab--active {
+  color: #2024c7;
+}
+
+.register-tabs__tab--active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 3px;
+  border-radius: 999px;
+  background: #2024c7;
+}
+
+.register-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.register-field {
+  display: grid;
+  gap: 10px;
+}
+
+.register-field__label {
+  color: #3f4d69;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.register-field__control {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: #f8f9fc;
+  color: #a2abbd;
+  transition:
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.register-field__control:focus-within {
+  background: #f6f8ff;
+  box-shadow: 0 0 0 1px rgba(32, 39, 201, 0.18);
+}
+
+.register-field__control input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #24324f;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+}
+
+.register-field__control input::placeholder {
+  color: #97a1b3;
+}
+
+.register-form__error {
+  color: #d33b3b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.register-field__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #a8b1c3;
+}
+
+.register-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  color: #8a96ab;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.register-remember input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: #2027c9;
+}
+
+.register-submit {
+  height: 54px;
+  border: 0;
+  border-radius: 8px;
+  background: #2027c9;
+  box-shadow: 0 12px 22px rgba(32, 39, 201, 0.28);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.register-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.register-divider span {
+  flex: 1;
+  height: 1px;
+  background: #eceef5;
+}
+
+.register-divider p {
+  color: #9aa5b8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.register-socials {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.register-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  border: 1px solid #dde2ec;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #26334f;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.register-social__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.register-social__icon--google {
+  background: linear-gradient(
+    135deg,
+    #4285f4 0%,
+    #4285f4 25%,
+    #34a853 25%,
+    #34a853 50%,
+    #fbbc05 50%,
+    #fbbc05 75%,
+    #ea4335 75%,
+    #ea4335 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.register-social__icon--facebook {
+  border-radius: 50%;
+  background: #1877f2;
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.register-card__footer {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #eceef5;
+  text-align: center;
+}
+
+.register-card__footer p {
+  color: #7d899f;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.register-card__footer-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #2027c9;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .register-page__header {
+    padding: 0 16px;
+  }
+
+  .register-page__header-actions {
+    gap: 12px;
+  }
+
+  .register-page__main {
+    padding: 22px 14px 32px;
+  }
+
+  .register-card {
+    padding: 26px 18px 24px;
+  }
+
+  .register-tabs {
+    gap: 48px;
+  }
+
+  .register-socials {
+    grid-template-columns: 1fr;
+  }
+}

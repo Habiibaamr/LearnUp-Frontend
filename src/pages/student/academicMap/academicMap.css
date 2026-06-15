@@ -1,0 +1,231 @@
+.academic-map-main {
+  padding: 32px 28px 48px;
+}
+
+.academic-map-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.academic-map-breadcrumb {
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.academic-map-breadcrumb strong {
+  color: #075bff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.academic-map-heading h1 {
+  margin-top: 8px;
+  color: #202124;
+  font-family: "Outfit", "Poppins", sans-serif;
+  font-size: 38px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.academic-map-heading div > p:not(.academic-map-breadcrumb) {
+  max-width: 600px;
+  margin-top: 10px;
+  color: #4b5563;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.academic-map-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 34px;
+  margin-top: 45px;
+  padding: 14px 25px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.academic-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.academic-map-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.academic-map-legend .is-passed { background: #f4b400; }
+.academic-map-legend .is-enrolled { background: #aab5ff; }
+.academic-map-legend .is-locked { background: #efb6b6; }
+
+.academic-roadmap {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 28px;
+  margin-top: 34px;
+}
+
+.academic-roadmap-column {
+  min-width: 0;
+}
+
+.academic-roadmap-column header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.academic-roadmap-column__dot {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.academic-roadmap-column__dot.is-passed { background: #f4b400; }
+.academic-roadmap-column__dot.is-enrolled { background: #b4bfff; }
+.academic-roadmap-column__dot.is-current { background: #2563eb; color: #ffffff; }
+.academic-roadmap-column__dot.is-locked { background: #ffc7c7; }
+
+.academic-roadmap-column h2 {
+  color: #202124;
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.academic-roadmap-column__cards {
+  display: grid;
+  gap: 18px;
+}
+
+.academic-map-card {
+  position: relative;
+  min-height: 132px;
+  padding: 19px 18px;
+  border-left: 4px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+}
+
+.academic-map-card.is-passed { border-left-color: #f4b400; }
+.academic-map-card.is-enrolled { border-left-color: #b8c1ff; }
+.academic-map-card.is-locked { border-left-color: #ffb8b8; }
+
+.academic-map-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.academic-map-card__top span {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.academic-map-card.is-passed .academic-map-card__top span {
+  background: #fff3c4;
+  color: #9a7400;
+}
+
+.academic-map-card.is-enrolled .academic-map-card__top span {
+  background: #eef2ff;
+  color: #5962d9;
+}
+
+.academic-map-card.is-locked .academic-map-card__top span {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.academic-map-card__top i {
+  display: inline-flex;
+  color: #9aa6ff;
+}
+
+.academic-map-card.is-passed .academic-map-card__top i { color: #f4b400; }
+.academic-map-card.is-locked .academic-map-card__top i { color: #ef8f8f; }
+
+.academic-map-card h3 {
+  margin-top: 16px;
+  color: #22252b;
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1.22;
+}
+
+.academic-map-card p {
+  margin-top: 8px;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.academic-map-card.has-arrow::after {
+  content: "→";
+  position: absolute;
+  right: -31px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #0b25d7;
+  font-size: 34px;
+  font-weight: 500;
+  z-index: 1;
+}
+
+@media (max-width: 1260px) {
+  .academic-roadmap {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 30px;
+  }
+
+  .academic-map-card.has-arrow::after {
+    content: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .academic-map-main {
+    padding: 26px 16px 38px;
+  }
+
+  .academic-map-heading {
+    flex-direction: column;
+  }
+
+  .academic-map-legend {
+    margin-top: 0;
+  }
+
+  .academic-roadmap {
+    grid-template-columns: 1fr;
+  }
+
+  .academic-map-heading h1 {
+    font-size: 32px;
+  }
+}
