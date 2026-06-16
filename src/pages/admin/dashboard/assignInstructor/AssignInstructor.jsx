@@ -1,44 +1,63 @@
-import { CheckCircle, ChevronDown, Info, UserRound, X } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle, ChevronDown, Info, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../../components/admin/AdminSidebar.jsx";
 import AdminTopbar from "../../../../components/admin/AdminTopbar.jsx";
+import {
+  assignInstructorToOffering,
+  listAdminInstructors,
+  listCourseOfferingInstructors,
+  listCourseOfferings,
+} from "../../../../services/adminAssignments.js";
 import "./assignInstructor.css";
 
-// Mock instructor assignment rows stay in place until admin assignment endpoints are wired.
-const rows = [
-  { name: "Dr. Sarah Jenkins", email: "s.jenkins@eduadmin.com", department: "Computer Science", load: "1/3", progress: 33, courses: ["CS101"] },
-  { name: "Prof. Michael Chen", email: "m.chen@eduadmin.com", department: "Computer Science", load: "2/3", progress: 66, courses: ["CS202", "CS404"] },
-  { name: "Dr. Elena Rodriguez", email: "e.rodriguez@eduadmin.com", department: "Computer Science", load: "3/3", progress: 100, courses: ["CS105", "CS210", "CS302"] },
-  { name: "Prof. David Wilson", email: "d.wilson@eduadmin.com", department: "Computer Science", load: "1/3", progress: 33, courses: ["CS201"] },
-  { name: "Prof. Sarah Mitchell", email: "s.mitchell@eduadmin.com", department: "Computer Science", load: "1/3", progress: 33, courses: ["CS101"] },
-  { name: "Dr. Arjun Kapoor", email: "a.kapoor@eduadmin.com", department: "Computer Science", load: "3/3", progress: 100, courses: ["CS105", "CS210", "CS302"] },
-  { name: "Prof. Elena Rodriguez", email: "e.rodriguez@eduadmin.com", department: "Computer Science", load: "2/3", progress: 66, courses: ["CS202", "CS404"] },
-  { name: "James Wilson", email: "j.wilson@eduadmin.com", department: "Computer Science", load: "0/3", progress: 0, courses: [] },
-];
+const getInitials = (name = "") =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(-2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "FM";
 
-const courses = [
-  "Advanced neural network",
-  "Advanced Algorithms",
-  "Data Structures",
-  "Human Computer Interaction",
-  "Database Systems",
-];
-
-export function AssignInstructorModal({ instructor, onClose }) {
+export function AssignInstructorModal({
+  assignmentError,
+  courseOfferings,
+  instructor,
+  isSubmitting,
+  onAssign,
+  onClose,
+}) {
   const navigate = useNavigate();
   const [selectedCourse, setSelectedCourse] = useState("");
   const [error, setError] = useState("");
 
-  const currentInstructor = instructor ?? rows[0];
+  const currentInstructor = instructor;
+  const selectedOffering = courseOfferings.find(
+    (offering) => String(offering.courseOfferingId) === selectedCourse,
+  );
 
-  const handleConfirm = () => {
-    if (!selectedCourse) {
+  const handleConfirm = async () => {
+    setError("");
+
+    if (!currentInstructor) {
+      setError("Please select a faculty member before confirming.");
+      return;
+    }
+
+    if (!selectedOffering) {
       setError("Please select a course before confirming.");
       return;
     }
 
-    navigate("/admin/assignment-success");
+    const payload = {
+      course_offering_id: selectedOffering.courseOfferingId,
+      instructor_id: currentInstructor.instructorId,
+    };
+
+    console.log("ASSIGN FACULTY SUBMIT CLICKED");
+
+    await onAssign(payload, selectedOffering);
   };
 
   return (
@@ -47,13 +66,13 @@ export function AssignInstructorModal({ instructor, onClose }) {
         <button type="button" className="assign-modal__close" onClick={onClose ?? (() => navigate("/admin/assign-instructor"))} aria-label="Close"><X size={18} /></button>
         <h1>Assign Faculty Member to Course</h1>
         <article className="assign-modal-profile">
-          <span className="assign-modal-avatar">{currentInstructor.name.split(" ").slice(-2).map((part) => part[0]).join("")}</span>
+          <span className="assign-modal-avatar">{getInitials(currentInstructor?.name)}</span>
           <div>
-            <h2>{currentInstructor.name}</h2>
-            <p>{currentInstructor.department}</p>
+            <h2>{currentInstructor?.name || "Faculty Member"}</h2>
+            <p>{currentInstructor?.department || "Department pending"}</p>
             <div className="assign-modal-load">
-              <span>COURSES LOAD</span><strong>{currentInstructor.load}</strong>
-              <i><b style={{ width: `${currentInstructor.progress}%` }} /></i>
+              <span>COURSES LOAD</span><strong>{currentInstructor?.load || "0/3"}</strong>
+              <i><b style={{ width: `${currentInstructor?.progress || 0}%` }} /></i>
             </div>
           </div>
         </article>
@@ -68,24 +87,30 @@ export function AssignInstructorModal({ instructor, onClose }) {
               }}
             >
               <option value="">Choose course</option>
-              {courses.map((course) => <option key={course} value={course}>{course}</option>)}
+              {courseOfferings.map((course) => (
+                <option key={course.courseOfferingId} value={course.courseOfferingId}>
+                  {course.label}
+                </option>
+              ))}
             </select>
             <ChevronDown size={18} />
           </div>
         </label>
-        {selectedCourse && <p className="assign-modal-selected">Selected course: <strong>{selectedCourse}</strong></p>}
-        {error && <p className="assign-modal-error">{error}</p>}
+        {selectedOffering && <p className="assign-modal-selected">Selected course: <strong>{selectedOffering.label}</strong></p>}
+        {(error || assignmentError) && <p className="assign-modal-error">{error || assignmentError}</p>}
         <div className="assign-modal-current">
           <h3>Current Courses</h3>
-          {currentInstructor.courses.length > 0 ? (
+          {currentInstructor?.courses?.length > 0 ? (
             currentInstructor.courses.map((course) => <span key={course}><Info size={12} /> {course}</span>)
           ) : (
             <span><Info size={12} /> No current courses</span>
           )}
         </div>
         <footer>
-          <button type="button" onClick={onClose ?? (() => navigate("/admin/assign-instructor"))}>Cancel</button>
-          <button type="button" onClick={handleConfirm} disabled={!selectedCourse}>Confirm Assignment</button>
+          <button type="button" onClick={onClose ?? (() => navigate("/admin/assign-instructor"))} disabled={isSubmitting}>Cancel</button>
+          <button type="button" onClick={handleConfirm} disabled={!currentInstructor || !selectedCourse || isSubmitting}>
+            {isSubmitting ? "Assigning..." : "Confirm Assignment"}
+          </button>
         </footer>
       </section>
     </div>
@@ -94,7 +119,80 @@ export function AssignInstructorModal({ instructor, onClose }) {
 
 export default function AssignInstructor() {
   const [open, setOpen] = useState(false);
+  const [assignmentError, setAssignmentError] = useState("");
+  const [courseOfferings, setCourseOfferings] = useState([]);
+  const [instructors, setInstructors] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [selectedInstructor, setSelectedInstructor] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAssignmentOptions() {
+      setIsLoading(true);
+      setLoadError("");
+
+      try {
+        const [backendInstructors, backendCourseOfferings] = await Promise.all([
+          listAdminInstructors(),
+          listCourseOfferings(),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setInstructors(backendInstructors);
+        setCourseOfferings(backendCourseOfferings);
+        setSelectedInstructor(null);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setLoadError(error?.message || "Assignment options could not be loaded.");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadAssignmentOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleAssign = async (payload) => {
+    setAssignmentError("");
+    setSuccessMessage("");
+    setIsSubmitting(true);
+
+    try {
+      await assignInstructorToOffering(payload);
+
+      try {
+        await listCourseOfferingInstructors(payload.course_offering_id);
+      } catch (error) {
+        console.info(
+          `[LearnUp] Assignment verification skipped (${error?.status || 0}: ${error?.message || "Unknown error"}).`,
+        );
+      }
+
+      setOpen(false);
+      setSuccessMessage("Faculty member assigned successfully.");
+      setSelectedInstructor(null);
+    } catch (error) {
+      setAssignmentError(error?.message || "Faculty member could not be assigned. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="admin-app-shell assign-instructor-page-v2">
@@ -105,6 +203,8 @@ export default function AssignInstructor() {
           <p className="assign-breadcrumb"><span>Faculty Members</span> &gt; <strong>Assign Faculty Member</strong></p>
           <h1>Select Faculty Member for CS303</h1>
           <p>Available computer science faculty for the Advanced Algorithms course.</p>
+          {successMessage && <p className="assign-page-status assign-page-status--success" role="status">{successMessage}</p>}
+          {loadError && <p className="assign-page-status assign-page-status--error" role="alert">{loadError}</p>}
 
           <section className="assign-table-card">
             <table>
@@ -117,17 +217,20 @@ export default function AssignInstructor() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((instructor, index) => {
+                {instructors.map((instructor) => {
                   const full = instructor.progress === 100;
                   const selected = selectedInstructor === instructor;
                   return (
                     <tr
-                      key={`${instructor.name}-${index}`}
+                      key={instructor.instructorId}
                       className={`${full ? "is-muted" : ""} ${selected ? "is-selected" : ""}`}
-                      onClick={() => setSelectedInstructor(instructor)}
+                      onClick={() => {
+                        setSelectedInstructor(instructor);
+                        setSuccessMessage("");
+                      }}
                     >
                       <td>
-                        <span className="admin-person-avatar">{instructor.name.split(" ").slice(-2).map((p) => p[0]).join("")}</span>
+                        <span className="admin-person-avatar">{getInitials(instructor.name)}</span>
                         <div><strong>{instructor.name}</strong><small>{instructor.email}</small></div>
                       </td>
                       <td>{instructor.department}</td>
@@ -140,7 +243,11 @@ export default function AssignInstructor() {
                       </td>
                       <td>
                         <div className="assign-course-pills">
-                          {instructor.courses.map((course) => <span key={course}>{course}</span>)}
+                          {instructor.courses.length > 0 ? (
+                            instructor.courses.map((course) => <span key={course}>{course}</span>)
+                          ) : (
+                            <span>No courses</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -148,15 +255,37 @@ export default function AssignInstructor() {
                 })}
               </tbody>
             </table>
+            {!isLoading && instructors.length === 0 && (
+              <p className="assign-empty-state">No faculty members are available.</p>
+            )}
           </section>
 
           <div className="assign-bottom-actions">
             <button type="button">Cancel</button>
-            <button type="button" onClick={() => setOpen(true)} disabled={!selectedInstructor}>Assign Faculty Member <CheckCircle size={14} /></button>
+            <button
+              type="button"
+              onClick={() => {
+                setAssignmentError("");
+                setSuccessMessage("");
+                setOpen(true);
+              }}
+              disabled={!selectedInstructor || courseOfferings.length === 0}
+            >
+              Assign Faculty Member <CheckCircle size={14} />
+            </button>
           </div>
         </main>
       </div>
-      {open && <AssignInstructorModal instructor={selectedInstructor} onClose={() => setOpen(false)} />}
+      {open && (
+        <AssignInstructorModal
+          assignmentError={assignmentError}
+          courseOfferings={courseOfferings}
+          instructor={selectedInstructor}
+          isSubmitting={isSubmitting}
+          onAssign={handleAssign}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </div>
   );
 }

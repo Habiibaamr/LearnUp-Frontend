@@ -90,6 +90,7 @@ export function LearnUpRoutes() {
           path="/admin/create-instructor-profile"
           element={requireRole("admin", <CreateInstructor initialModalOpen />)}
         />
+        <Route path="/admin/assign-faculty-member" element={requireRole("admin", <AssignInstructorPage />)} />
         <Route path="/admin/assign-instructor" element={requireRole("admin", <AssignInstructorPage />)} />
         <Route path="/admin/assignment-success" element={requireRole("admin", <AssignmentSuccessPage />)} />
         <Route path="/admin/students-enrolled" element={requireRole("admin", <StudentsEnrolled />)} />

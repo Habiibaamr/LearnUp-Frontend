@@ -26,6 +26,22 @@
   font-size: 15px;
 }
 
+.assign-page-status,
+.assign-empty-state {
+  margin: 14px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.assign-page-status--error {
+  color: #dc2626;
+}
+
+.assign-page-status--success {
+  color: #15803d;
+}
+
 .assign-table-card {
   overflow: hidden;
   margin-top: 25px;
@@ -37,6 +53,10 @@
 .assign-table-card table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.assign-empty-state {
+  padding: 18px 38px;
 }
 
 .assign-table-card th {
