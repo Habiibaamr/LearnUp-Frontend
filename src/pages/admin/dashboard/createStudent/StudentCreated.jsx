@@ -13,6 +13,7 @@ export default function StudentCreated() {
   const { studentId } = useParams();
   const { state } = useLocation();
   const student =
+    state?.createdStudent ||
     findStudentById(studentId) ||
     findStudentById(state?.studentId) ||
     getLastCreatedStudent();

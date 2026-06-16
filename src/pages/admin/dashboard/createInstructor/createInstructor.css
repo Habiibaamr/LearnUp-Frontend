@@ -15,6 +15,16 @@
   font-size: 15px;
 }
 
+.instructor-page-status {
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.instructor-page-status--error {
+  color: #b42318;
+}
+
 .instructor-table-card {
   margin-top: 24px;
   overflow: hidden;
@@ -358,6 +368,17 @@
   line-height: 1.45;
 }
 
+.instructor-modal-status {
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.instructor-modal-status--error {
+  color: #b42318;
+}
+
 .instructor-create-modal footer {
   display: flex;
   justify-content: flex-end;
@@ -382,6 +403,11 @@
 .instructor-create-modal footer button:last-child {
   background: #2024c7;
   color: #ffffff;
+}
+
+.instructor-create-modal footer button:disabled {
+  cursor: not-allowed;
+  opacity: .68;
 }
 
 .instructor-profile-modal {

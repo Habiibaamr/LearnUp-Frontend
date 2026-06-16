@@ -1,27 +1,50 @@
-import { getItem } from "../utils/storage.js";
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || "https://learn-up-project-vnmh.vercel.app"
+).replace(/\/+$/, "");
+const ACCESS_TOKEN_STORAGE_KEY = "learnup_access_token";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+export class ApiError extends Error {
+  constructor(message, { status = 0, data = null, path = "" } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
+    this.path = path;
+  }
+}
 
-function getStoredToken() {
-  const session = getItem("learnup:session") || {};
-  const currentUser = getItem("learnup:currentUser") || {};
+function getAccessToken() {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return "";
+    }
 
-  return (
-    session.accessToken ||
-    session.access_token ||
-    session.token ||
-    currentUser.accessToken ||
-    currentUser.access_token ||
-    currentUser.token ||
-    ""
-  );
+    return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
 }
 
 function getErrorMessage(status, data, fallback) {
+  if (status === 401) {
+    return "Your session expired. Please login again.";
+  }
+
   if (data?.detail) {
-    return Array.isArray(data.detail)
-      ? data.detail.map((item) => item.msg || item.message || String(item)).join(", ")
-      : String(data.detail);
+    if (Array.isArray(data.detail)) {
+      return data.detail
+        .map((item) => {
+          const fieldPath = Array.isArray(item.loc)
+            ? item.loc.filter((part) => part !== "body").join(".")
+            : "";
+          const message = item.msg || item.message || String(item);
+
+          return fieldPath ? `${fieldPath}: ${message}` : message;
+        })
+        .join(", ");
+    }
+
+    return String(data.detail);
   }
 
   if (data?.message) {
@@ -46,37 +69,34 @@ async function parseResponse(response) {
 }
 
 async function request(path, { method = "GET", body, headers = {}, signal } = {}) {
-  if (!API_BASE_URL) {
-    console.info(
-      "[LearnUp] VITE_API_BASE_URL is not configured; no backend request was sent.",
-    );
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
-    return {
-      ok: false,
+  if (!API_BASE_URL) {
+    throw new ApiError("VITE_API_BASE_URL is not configured.", {
       status: 0,
-      data: null,
-      message: "VITE_API_BASE_URL is not configured.",
-    };
+      path: normalizedPath,
+    });
   }
 
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const token = getStoredToken();
+  const token = getAccessToken();
   const requestHeaders = {
     Accept: "application/json",
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...headers,
   };
 
   const hasBody = body !== undefined && body !== null;
 
-  if (hasBody && !(body instanceof FormData)) {
-    requestHeaders["Content-Type"] = "application/json";
-  }
-
-  if (token) {
-    requestHeaders.Authorization = `Bearer ${token}`;
+  if (body instanceof FormData) {
+    delete requestHeaders["Content-Type"];
   }
 
   try {
+    if (normalizedPath === "/admin/create-student-account") {
+      console.log("CALLING BACKEND CREATE STUDENT");
+    }
+
     const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
       method,
       headers: requestHeaders,
@@ -90,27 +110,23 @@ async function request(path, { method = "GET", body, headers = {}, signal } = {}
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      return {
-        ok: false,
+      throw new ApiError(getErrorMessage(response.status, data), {
         status: response.status,
         data,
-        message: getErrorMessage(response.status, data),
-      };
+        path: normalizedPath,
+      });
     }
 
-    return {
-      ok: true,
-      status: response.status,
-      data,
-      message: "OK",
-    };
+    return data;
   } catch (error) {
-    return {
-      ok: false,
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    throw new ApiError(error?.message || "Network request failed.", {
       status: 0,
-      data: null,
-      message: error?.message || "Network request failed.",
-    };
+      path: normalizedPath,
+    });
   }
 }
 
@@ -123,4 +139,4 @@ export const apiClient = {
   delete: (path, options) => request(path, { ...options, method: "DELETE" }),
 };
 
-export { API_BASE_URL };
+export { ACCESS_TOKEN_STORAGE_KEY, API_BASE_URL };

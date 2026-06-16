@@ -1,8 +1,14 @@
 import { Eye, Info, MoreVertical, Search, UserPlus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../../components/admin/AdminSidebar.jsx";
 import AdminTopbar from "../../../../components/admin/AdminTopbar.jsx";
+import {
+  createInstructorAccount,
+  isMissingEndpointError,
+  listInstructors,
+  mapBackendInstructor,
+} from "../../../../services/adminAccounts.js";
 import {
   encodeRecordId,
   generateFacultyId,
@@ -50,7 +56,7 @@ const getLoadProgress = (courseLoad) => {
   return Math.min(100, Math.round((current / total) * 100));
 };
 
-function InstructorModal({ onClose, onCreate }) {
+function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
   const [form, setForm] = useState(getInitialInstructorForm);
 
   const handleChange = (event) => {
@@ -61,9 +67,9 @@ function InstructorModal({ onClose, onCreate }) {
     }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    onCreate({
+    await onCreate({
       ...form,
       load: form.courseLoad,
       progress: getLoadProgress(form.courseLoad),
@@ -225,11 +231,18 @@ function InstructorModal({ onClose, onCreate }) {
             <Info size={16} />
             An invitation email with setup instructions will be automatically sent to the faculty member upon creation.
           </div>
+          {errorMessage && (
+            <p className="instructor-modal-status instructor-modal-status--error" role="alert">
+              {errorMessage}
+            </p>
+          )}
         </section>
 
         <footer>
-          <button type="button" onClick={onClose}>CANCEL</button>
-          <button type="submit">CREATE FACULTY MEMBER</button>
+          <button type="button" onClick={onClose} disabled={isSubmitting}>CANCEL</button>
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "CREATING..." : "CREATE FACULTY MEMBER"}
+          </button>
         </footer>
       </form>
     </div>
@@ -240,7 +253,34 @@ export default function CreateInstructor({ initialModalOpen = false }) {
   const [open, setOpen] = useState(initialModalOpen);
   const [searchTerm, setSearchTerm] = useState("");
   const [instructors, setInstructors] = useState(() => getFacultyMembers());
+  const [submitError, setSubmitError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  const refreshInstructorsFromBackend = async () => {
+    try {
+      setLoadError("");
+      const backendInstructors = await listInstructors();
+
+      setInstructors(backendInstructors);
+      return true;
+    } catch (error) {
+      if (error?.status === 401) {
+        setLoadError("Your session expired. Please login again.");
+      }
+
+      console.info(
+        `[LearnUp] Instructor list backend refresh skipped (${error?.status || 0}: ${error?.message || "Unknown error"}).`,
+      );
+    }
+
+    return false;
+  };
+
+  useEffect(() => {
+    refreshInstructorsFromBackend();
+  }, []);
 
   const filteredInstructors = instructors.filter((instructor) => {
     const query = searchTerm.trim().toLowerCase();
@@ -261,13 +301,40 @@ export default function CreateInstructor({ initialModalOpen = false }) {
     });
   };
 
-  const handleCreateInstructor = (formValues) => {
-    const instructor = saveFacultyRecord(formValues);
-    setInstructors(getFacultyMembers());
-    setOpen(false);
-    navigate(`/admin/instructor-created/${encodeRecordId(instructor.id)}`, {
-      state: { facultyId: instructor.id },
-    });
+  const handleCreateInstructor = async (formValues) => {
+    setSubmitError("");
+    setIsSubmitting(true);
+
+    try {
+      const backendInstructor = await createInstructorAccount(formValues);
+      const instructor = saveFacultyRecord(mapBackendInstructor(backendInstructor, formValues));
+      const didRefresh = await refreshInstructorsFromBackend();
+
+      if (!didRefresh) {
+        setInstructors(getFacultyMembers());
+      }
+
+      setOpen(false);
+      navigate(`/admin/instructor-created/${encodeRecordId(instructor.id)}`, {
+        state: { facultyId: instructor.id },
+      });
+    } catch (error) {
+      if (isMissingEndpointError(error)) {
+        // Mock fallback is intentionally kept only for a missing backend endpoint.
+        const instructor = saveFacultyRecord(formValues);
+
+        setInstructors(getFacultyMembers());
+        setOpen(false);
+        navigate(`/admin/instructor-created/${encodeRecordId(instructor.id)}`, {
+          state: { facultyId: instructor.id },
+        });
+        return;
+      }
+
+      setSubmitError(error?.message || "Faculty member could not be created. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -280,6 +347,12 @@ export default function CreateInstructor({ initialModalOpen = false }) {
             <h1>Faculty Member</h1>
             <p>Oversee academic staff, course loads, and departmental assignments.</p>
           </section>
+
+          {loadError && (
+            <p className="instructor-page-status instructor-page-status--error" role="alert">
+              {loadError}
+            </p>
+          )}
 
           <section className="instructor-table-card">
             <label className="instructor-search">
@@ -347,12 +420,27 @@ export default function CreateInstructor({ initialModalOpen = false }) {
             </table>
             <footer>
               <div><button type="button">&lt;</button><span>Showing {filteredInstructors.length} of<br />{instructors.length}</span><button type="button">&gt;</button></div>
-              <button type="button" onClick={() => setOpen(true)}><UserPlus size={16} /> Create New Faculty Member</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitError("");
+                  setOpen(true);
+                }}
+              >
+                <UserPlus size={16} /> Create New Faculty Member
+              </button>
             </footer>
           </section>
         </main>
       </div>
-      {open && <InstructorModal onClose={() => setOpen(false)} onCreate={handleCreateInstructor} />}
+      {open && (
+        <InstructorModal
+          errorMessage={submitError}
+          isSubmitting={isSubmitting}
+          onClose={() => setOpen(false)}
+          onCreate={handleCreateInstructor}
+        />
+      )}
     </div>
   );
 }

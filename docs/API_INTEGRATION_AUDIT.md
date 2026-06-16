@@ -4,80 +4,76 @@ Backend base URL: `https://learn-up-project-vnmh.vercel.app`
 
 Environment variable: `VITE_API_BASE_URL`
 
-Probe date: 2026-06-14
+Probe date: 2026-06-16
 
 ## Backend Discovery
 
-| Endpoint | Method | Probe result | Notes |
-|---|---:|---|---|
-| `/` | GET | 200 | Public health message: backend is running. |
-| `/docs` | GET | 200 | FastAPI Swagger UI exists. |
-| `/openapi.json` | GET | 200 | OpenAPI schema exists. |
-| `/health` | GET | 200 | Reports `database_configured: false`; backend data flows are not usable yet. |
-| `/auth/login` | POST | Exists, currently 503 | OpenAPI confirms login; live response says `Database is not configured. Set DATABASE_URL in environment variables.` |
-| `/auth/me` | GET | Exists, 401 without token | Depends on successful backend auth. |
-| `/student/me/card` | GET | Exists, 401 without token | Student identity/profile candidate. |
-| `/student/v2/me/card` | GET | Exists, 401 without token | Preferred student identity-card endpoint per OpenAPI. |
-| `/student/me/courses` | GET | Exists, 401 without token | Student registered courses candidate. |
-| `/student/me/course-board` | GET | Exists, 401 without token | Student course board candidate. |
-| `/student/me/add-course/{course_offering_id}` | POST | Exists | Course enrollment candidate. |
-| `/student/me/drop-course/{course_offering_id}` | POST | Exists | Course drop candidate. |
-| `/admin/users` | GET | Exists, 401 without token | Admin user list candidate. |
-| `/admin/instructors` | GET | Exists, 401 without token | Admin instructor list candidate. |
-| `/admin/course-offerings` | GET | Exists, 401 without token | Admin/faculty course offering candidate. |
-| `/admin/create-student-account` | POST | Exists | Student creation candidate. |
-| `/admin/create-instructor-account` | POST | Exists | Instructor creation candidate. |
-| `/admin/assign-instructor-to-offering` | POST | Exists | Instructor assignment candidate. |
-| `/admin/final-grades-window` | GET | Exists | Result publishing window candidate, not semester results. |
-| `/instructor/my-offerings` | GET | Exists, 401 without token | Faculty course board candidate. |
-| `/instructor/my-offerings/{course_offering_id}/registrations` | GET | Exists | Faculty course students candidate. |
-| `/instructor/students/{university_id}` | GET | Exists | Faculty view of a student candidate. |
-| `/chat/start` | POST | Exists | Advisor bot session start candidate. |
-| `/chat/my-sessions` | GET | Exists, 401 without token | Advisor bot history candidate. |
-| `/chat/{session_id}/message` | POST | Exists | Advisor bot send-message candidate. |
-| `/login`, `/api/login`, `/api/auth/login` | POST | 404 | Missing; do not use. |
-| `/students`, `/api/students` | GET | 404 | Missing generic student-list endpoints. |
-| `/faculty`, `/faculties`, `/api/faculty`, `/api/faculties` | GET | 404 | Missing generic faculty endpoints. |
-| `/courses`, `/api/courses` | GET | 404 | Missing generic course endpoints. Use confirmed course-board/offering endpoints later. |
-| `/results`, `/semester-results`, `/api/results`, `/api/semester-results` | GET | 404 | Missing direct semester-result endpoints. |
+Live checks:
 
-## Frontend Feature Audit
+| Source | Result |
+|---|---|
+| `/docs` | 200, FastAPI Swagger UI HTML |
+| `/openapi.json` | 200, OpenAPI 3.1 schema |
 
-| Page/component | Feature/action | Current data source | Required backend endpoint | Method | Request body | Expected response shape | Endpoint exists or missing | Integrate now? |
-|---|---|---|---|---:|---|---|---|---|
-| `LoginPage` | Sign in and route by role | Demo email-domain auth + localStorage session | `/auth/login` | POST | `{ email, password }` | `{ access_token, token_type, role }` | Exists, but currently 503 because DB is not configured | Yes, safe try with demo fallback |
-| `RequireRole` in `App.jsx` | Protect routes | `learnup:session` localStorage | `/auth/me` | GET | none | `{ id, university_id, full_name, email, role }` | Exists, 401 without token | Stay mock until login works |
-| `RegisterPage` | Create student account | localStorage + `saveStudentRecord` | `/admin/create-student-account` or student self-register endpoint | POST | `{ full_name, email, password, faculty_id?, department_id?, level?, cgpa?, passed_credit_hours?, phone? }` | Created user/student object | Admin endpoint exists; self-register endpoint missing | Stay mock temporarily |
-| `StudentDashboard` | Profile/progress summary | Inline mock + `learnupRecords` session data | `/student/v2/me/card` | GET | none | Student identity/progress card object | Exists, 401 without token | Stay mock temporarily |
-| `StudentDashboard` | Course-board preview and status tabs | Inline mock `rows` | `/student/me/course-board` | GET | none | Array/grouped courses with status, credits, eligibility | Exists, 401 without token | Stay mock temporarily |
-| `CourseBoard` | List/filter course cards | Inline mock course templates | `/student/me/course-board` | GET | none | Course board grouped by available/enrolled/locked/passed | Exists, 401 without token | Stay mock temporarily |
-| `CourseBoard` | Enroll/drop course | Button-only mock UI | `/student/me/add-course/{course_offering_id}` and `/student/me/drop-course/{course_offering_id}` | POST | path id | Updated registration/course board state | Exists | Stay mock until IDs map to UI data |
-| `AcademicMap` | Degree roadmap | Inline mock `levels` | Not confirmed | GET | none | Levels with courses, prerequisites, status | Missing direct endpoint | Stay mock |
-| `SemesterResult` | Filter semester results | `data/studentSemesterResults.js` | Not confirmed | GET | likely `{ academicYear, term }` or query params | Courses with grades, status, GPA, credits | Missing direct endpoint | Stay mock |
-| `AcademicAdvisorBot` | Chat history | Inline mock `history` | `/chat/my-sessions` and `/chat/{session_id}/messages` | GET | none/path id | Session list and message list | Exists, 401 without token | Stay mock temporarily |
-| `AcademicAdvisorBot` | Send message | Local component state | `/chat/start`, `/chat/{session_id}/message` | POST | `{ message }` | `{ session_id, user_message, assistant_response, kb?, sources? }` | Exists | Stay mock until auth works |
-| `StudentProfile` | Student details/card | `resolveStudentForSession`, localStorage records | `/student/v2/me/card`; admin/faculty student endpoint for cross-role view | GET | none or `university_id` path | Student profile/card object | Student self endpoint exists; cross-role endpoint partially exists under instructor | Stay mock temporarily |
-| `Admin Dashboard` | Stats, analytics | Inline mock `stats` and chart values | `/admin/users`, `/admin/instructors`, `/admin/course-offerings` or future summary endpoint | GET | none | Counts and analytics aggregates | List endpoints exist; summary endpoint missing | Stay mock temporarily |
-| `CreateStudent` | List/search/filter students | `getStudents()` localStorage merge | `/admin/users` filtered by role or future student list endpoint | GET | none/query | Student array | `/admin/users` exists; generic student list missing | Stay mock temporarily |
-| `CreateStudent` | Create student | `saveStudentRecord` localStorage | `/admin/create-student-account` | POST | `{ full_name, email, password, faculty_id?, department_id?, level?, cgpa?, passed_credit_hours?, phone? }` | Created student/account | Exists | Stay mock until auth works |
-| `StudentCreated` | Created student confirmation | last-created localStorage id | `/admin/create-student-account` response | POST result | same as create student | Created student/account payload | Exists | Stay mock temporarily |
-| `StudentsEnrolled` | Enrolled student roster and edits | `getStudents()` / `saveStudentRecord` | `/admin/users` or future student roster/update endpoint | GET/PATCH | update fields | Student list / updated student | Generic roster/update endpoint missing | Stay mock |
-| `CreateInstructor` | List/search/filter instructors | `getFacultyMembers()` localStorage merge | `/admin/instructors` | GET | none | Instructor array | Exists, 401 without token | Stay mock temporarily |
-| `CreateInstructor` | Create instructor | `saveFacultyRecord` localStorage | `/admin/create-instructor-account` | POST | `{ full_name, email, password, faculty_id?, department_id?, specialization?, office_location?, phone? }` | Created instructor/account | Exists | Stay mock until auth works |
-| `AssignInstructor` | Instructor/course assignment | Inline mock `rows` and `courses` | `/admin/course-offerings`, `/admin/instructors`, `/admin/assign-instructor-to-offering` | GET/POST | `{ course_offering_id, instructor_id }` | Course offerings, instructors, assignment result | Exists | Stay mock until IDs map to UI data |
-| `AdminProfile` | Admin profile details | local/mock session records | `/auth/me` or admin profile endpoint | GET | none | User profile object | `/auth/me` exists; admin profile endpoint missing | Stay mock temporarily |
-| `FacultyDashboard` | Faculty stats/snapshot/GPA chart | `data/facultyStudents.js` and inline aggregates | `/instructor/my-offerings`, `/instructor/my-offerings/{id}/registrations` | GET | path id | Offerings and registration/student arrays | Exists, 401 without token | Stay mock temporarily |
-| `FacultyCourseBoard` | Faculty course cards | `data/facultyCourses.js` | `/instructor/my-offerings` | GET | none | Course offering array | Exists, 401 without token | Stay mock temporarily |
-| `FacultyStudents` | Student roster/search/filter | `data/facultyStudents.js` | Could derive from `/instructor/my-offerings/{id}/registrations`; no all-students-for-instructor endpoint confirmed | GET | offering id | Registration/student array | Partial exists | Stay mock |
-| `CourseStudents` | Students for one course | `getFacultyCourseStudents()` mock mapping | `/instructor/my-offerings/{course_offering_id}/registrations` | GET | path id | Registration/student array | Exists | Stay mock until offering IDs map |
-| `EnrollStudent` | Candidate list/select/enroll | `getAvailableStudentsForCourse()` mock mapping | `/instructor/students/{university_id}/add-course...` or student add-course endpoints | POST | path ids | Updated registration result | Exists, but UI ID mapping missing | Stay mock |
-| `EnrollmentSuccess` | Enrollment confirmation | route state/mock course lookup | enrollment response from backend | POST result | same as enroll action | Enrolled students/course payload | Depends on enroll endpoint | Stay mock |
-| `FacultyProfile` | Faculty details/courses | `resolveFacultyForSession`, `facultyCourseLevels` | `/auth/me`, `/instructor/my-offerings` | GET | none | User profile and offerings | Exists, 401 without token | Stay mock temporarily |
+Confirmed endpoints needed for the first integration pass:
 
-## Recommended Next Integration Steps
+| Action | Endpoint | Method | Request body | Expected response |
+|---|---|---:|---|---|
+| Login | `/auth/login` | POST | `{ email, password }` | `{ access_token, token_type, role }` |
+| Current user/profile | `/auth/me` | GET | none | `{ id, university_id, full_name, email, role }` |
+| List users/students | `/admin/users` | GET | none | OpenAPI response schema is currently unspecified |
+| Create student | `/admin/create-student-account` | POST | `{ full_name, email, password, faculty_id?, department_id?, level?, cgpa?, passed_credit_hours?, phone?, advisor_instructor_id? }` | OpenAPI response schema is currently unspecified |
+| List instructors | `/admin/instructors` | GET | none | OpenAPI response schema is currently unspecified |
+| Create instructor/faculty member | `/admin/create-instructor-account` | POST | `{ full_name, email, password, faculty_id?, department_id?, specialization?, office_location?, phone? }` | OpenAPI response schema is currently unspecified |
+| List registered courses | `/student/me/courses` | GET | none | OpenAPI response schema not audited for this pass |
+| Course board | `/student/me/course-board` | GET | none | OpenAPI response schema not audited for this pass |
+| Enroll/register course | `/student/me/add-course/{course_offering_id}` | POST | path id | OpenAPI response schema not audited for this pass |
+| Drop course | `/student/me/drop-course/{course_offering_id}` | POST | path id | OpenAPI response schema not audited for this pass |
 
-1. Fix backend `DATABASE_URL` so `/auth/login` returns a real token.
-2. After login works, wire `/auth/me` into session hydration.
-3. Integrate read-only Student profile/course-board endpoints before write actions.
-4. Map frontend mock IDs to backend integer IDs before enabling create/enroll/assign actions.
-5. Keep localStorage fallback until each endpoint returns stable response shapes in the deployed backend.
+Notes:
+
+- Student and instructor create endpoints require bearer auth.
+- The admin create forms do not currently have real numeric `faculty_id` or `department_id` values, so the first wiring sends only safe fields from the schema.
+- Frontend display IDs such as `#STU-...` and `#FAC-...` are still local UI IDs unless the backend returns `university_id`.
+
+## Frontend Integration Table
+
+| Page/component | Action | Current mock/localStorage function | Backend endpoint needed | Method | Request body | Expected response | Ready |
+|---|---|---|---|---:|---|---|---|
+| `LoginPage` | Login | Demo fallback via `getOrCreateDemoAccountForLogin` and `setCurrentSession` | `/auth/login` | POST | `{ email, password }` | `{ access_token, token_type, role }` | Connected with demo fallback |
+| `CreateStudent` | Create student | Was `saveStudentRecord(formValues)` | `/admin/create-student-account` | POST | `{ full_name, email, password, level?, phone? }` | Created user/student object, unspecified schema | Connected now |
+| `CreateStudent` | List/search students | `getStudents()` from `learnupRecords.js` | `/admin/users` | GET | none | User/student array, unspecified schema | Connected as refresh with mock fallback |
+| `StudentCreated` | Confirmation | `findStudentById`, `getLastCreatedStudent` | Create response from `/admin/create-student-account` | POST result | same as create | Created student details | Keep local display cache |
+| `StudentsEnrolled` | Roster/edit | `getStudents()`, `saveStudentRecord`, hardcoded `students` | `/admin/users` plus future update endpoint | GET/PATCH | unknown update body | Student list / updated student | Keep mock |
+| `CreateInstructor` | Create faculty member | Was `saveFacultyRecord(formValues)` | `/admin/create-instructor-account` | POST | `{ full_name, email, password, specialization?, office_location?, phone? }` | Created instructor object, unspecified schema | Connected now |
+| `CreateInstructor` | List/search instructors | `getFacultyMembers()` from `learnupRecords.js` | `/admin/instructors` | GET | none | Instructor array, unspecified schema | Connected as refresh with mock fallback |
+| `InstructorSuccessPage` | Confirmation | `findFacultyById`, `getLastCreatedFaculty` | Create response from `/admin/create-instructor-account` | POST result | same as create | Created faculty details | Keep local display cache |
+| `AssignInstructor` | Assign course offering | Hardcoded `rows` and `courses` | `/admin/course-offerings`, `/admin/instructors`, `/admin/assign-instructor-to-offering` | GET/POST | `{ course_offering_id, instructor_id }` | Assignment result | Keep mock |
+| `Dashboard` | Admin stats/actions | Hardcoded `stats` and `actions` | likely `/admin/users`, `/admin/instructors`, `/admin/course-offerings` or summary endpoint | GET | none | Counts/aggregates | Keep mock |
+| `AdminProfile` | Admin profile | local session/mock profile | `/auth/me` | GET | none | User profile | Keep mock |
+| `RegisterPage` | Student self-register | `saveStudentRecord`, direct `localStorage.setItem` | No self-register endpoint confirmed | POST | unknown | Account/session | Keep mock |
+| `StudentDashboard` | Summary/course preview | hardcoded `rows`, local session records | `/student/v2/me/card`, `/student/me/course-board` | GET | none | Student card/course board | Keep mock |
+| `CourseBoard` | List/enroll/drop courses | Hardcoded course arrays and button-only state | `/student/me/course-board`, `/student/me/add-course/{course_offering_id}`, `/student/me/drop-course/{course_offering_id}` | GET/POST | path id for add/drop | Board/update result | Keep mock |
+| `AcademicMap` | Roadmap | Hardcoded `levels` | No direct endpoint confirmed | GET | unknown | Roadmap levels/courses | Keep mock |
+| `SemesterResult` | Results | `data/studentSemesterResults.js` | No direct semester-result endpoint confirmed | GET | unknown | Grades/GPA/credits | Keep mock |
+| `AcademicAdvisorBot` | Chat history/messages | Hardcoded `history`, `chips`, `initialMessages` | `/chat/start`, `/chat/my-sessions`, `/chat/{session_id}/message` | GET/POST | `{ message }` | Chat sessions/messages | Keep mock |
+| `StudentProfile` | Student details | `resolveStudentForSession`, `facultyStudents`, `learnupRecords.js` | `/student/v2/me/card`; faculty lookup may use `/instructor/students/{university_id}` | GET | path id for faculty lookup | Student profile/card | Keep mock |
+| `FacultyDashboard` | Faculty stats | `data/facultyStudents.js`, `learnupRecords.js` | `/instructor/my-offerings`, registrations endpoints | GET | offering id for registrations | Offerings/registration arrays | Keep mock |
+| `FacultyCourseBoard` | Faculty course cards | `data/facultyCourses.js` | `/instructor/my-offerings` | GET | none | Course offerings | Keep mock |
+| `FacultyStudents` | Faculty roster | `data/facultyStudents.js`, `learnupRecords.js` | `/instructor/my-offerings/{course_offering_id}/registrations` | GET | path id | Registration/student array | Keep mock |
+| `CourseStudents` | Students in course | `getFacultyCourseStudents()` | `/instructor/my-offerings/{course_offering_id}/registrations` | GET | path id | Registration/student array | Keep mock |
+| `EnrollStudent` | Faculty enroll student | Hardcoded `enrollmentCandidates`, course mock helpers | Enrollment endpoint not safely mapped to UI IDs yet | POST | unknown/path ids | Enrollment result | Keep mock |
+| `EnrollmentSuccess` | Enrollment confirmation | Route state plus fallback arrays | Enrollment response | POST result | same as enroll | Enrollment details | Keep mock |
+| `FacultyProfile` | Faculty profile/courses | `resolveFacultyForSession`, `facultyCourseLevels` | `/auth/me`, `/instructor/my-offerings` | GET | none | User profile/offerings | Keep mock |
+
+## Current Implementation
+
+- `src/services/apiClient.js` reads `VITE_API_BASE_URL`, attaches `Authorization: Bearer <token>` from `learnup:session` or `learnup:currentUser`, sends JSON headers, and throws `ApiError` with clear backend messages.
+- `src/services/adminAccounts.js` centralizes create/list endpoints and frontend/backend field mapping.
+- `CreateStudent` now POSTs to `/admin/create-student-account`; it refreshes `/admin/users` after success when the list response can be mapped.
+- `CreateInstructor` now POSTs to `/admin/create-instructor-account`; it refreshes `/admin/instructors` after success when the list response can be mapped.
+- Mock/localStorage fallback is only used for these create flows if the backend endpoint returns 404.
+
+## Deferred On Purpose
+
+Course Board, Academic Map, Semester Result, Faculty pages, assignment, enrollment, and profile hydration remain mocked until admin create/list is stable and backend IDs can be mapped safely.

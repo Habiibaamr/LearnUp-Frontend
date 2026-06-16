@@ -72,10 +72,17 @@ function LoginPage() {
     }
 
     setEmailError("");
-    const backendLogin = await loginWithBackend(email, password);
+    let backendLogin = null;
+    let backendLoginError = null;
 
-    if (backendLogin.ok && backendLogin.data?.access_token) {
-      const backendRole = backendLogin.data.role;
+    try {
+      backendLogin = await loginWithBackend(email, password);
+    } catch (error) {
+      backendLoginError = error;
+    }
+
+    if (backendLogin?.access_token) {
+      const backendRole = backendLogin.role;
       const appRole = getAppRoleFromBackendRole(backendRole);
 
       if (!appRole) {
@@ -84,13 +91,18 @@ function LoginPage() {
       }
 
       setLoginError("");
+      try {
+        localStorage.setItem("learnup_access_token", backendLogin.access_token);
+      } catch {
+        // If localStorage is unavailable, the session object below still preserves login state.
+      }
       setCurrentSession(appRole, {
-        email: backendLogin.data.email || email,
-        name: backendLogin.data.full_name || backendLogin.data.name || email,
+        email: backendLogin.email || email,
+        name: backendLogin.full_name || backendLogin.name || email,
         backendRole,
-        accessToken: backendLogin.data.access_token,
-        access_token: backendLogin.data.access_token,
-        tokenType: backendLogin.data.token_type || "bearer",
+        accessToken: backendLogin.access_token,
+        access_token: backendLogin.access_token,
+        tokenType: backendLogin.token_type || "bearer",
       });
       navigate(getDashboardPathForRole(appRole), { replace: true });
       return;
@@ -100,7 +112,7 @@ function LoginPage() {
 
     if (!role) {
       console.info(
-        `[LearnUp] Backend login failed (${backendLogin.status}: ${backendLogin.message}). ` +
+        `[LearnUp] Backend login failed (${backendLoginError?.status || 0}: ${backendLoginError?.message || "No response"}). ` +
           "No demo fallback is available for this email domain.",
       );
       setLoginError("Login failed. Please check your email and password.");
@@ -108,7 +120,7 @@ function LoginPage() {
     }
 
     console.info(
-      `[LearnUp] Backend login unavailable (${backendLogin.status}: ${backendLogin.message}). ` +
+      `[LearnUp] Backend login unavailable (${backendLoginError?.status || 0}: ${backendLoginError?.message || "No response"}). ` +
         "Using temporary demo login fallback.",
     );
 

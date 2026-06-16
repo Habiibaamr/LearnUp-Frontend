@@ -75,6 +75,16 @@
   background: #e8e8f3;
 }
 
+.student-page-status {
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.student-page-status--error {
+  color: #b42318;
+}
+
 .student-filters input,
 .student-filters select {
   width: 100%;
@@ -384,6 +394,17 @@
   line-height: 1.45;
 }
 
+.student-modal-status {
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.student-modal-status--error {
+  color: #b42318;
+}
+
 .student-create-modal footer {
   display: flex;
   justify-content: flex-end;
@@ -409,6 +430,11 @@
   background: #2024c7;
   color: #ffffff;
   box-shadow: 0 9px 18px rgba(32, 36, 199, .27);
+}
+
+.student-create-modal footer button:disabled {
+  cursor: not-allowed;
+  opacity: .68;
 }
 
 .student-profile-modal {

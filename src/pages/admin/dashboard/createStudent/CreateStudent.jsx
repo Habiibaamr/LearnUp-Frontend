@@ -1,14 +1,19 @@
 import { Eye, Info, Search, UserPlus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../../components/admin/AdminSidebar.jsx";
 import AdminTopbar from "../../../../components/admin/AdminTopbar.jsx";
+import {
+  createStudentAccount,
+  listStudents,
+  mapBackendStudent,
+  toCreateStudentPayload,
+} from "../../../../services/adminAccounts.js";
 import {
   encodeRecordId,
   generateStudentId,
   getInitials,
   getStudents,
-  saveStudentRecord,
   setSelectedStudentId,
 } from "../../../../utils/learnupRecords.js";
 import "./createStudent.css";
@@ -29,7 +34,7 @@ const getInitialStudentForm = () => ({
   department: "Computer Science",
 });
 
-function StudentModal({ onClose, onCreate }) {
+function StudentModal({ errorMessage, isSubmitting, onClose, onCreate }) {
   const [form, setForm] = useState(getInitialStudentForm);
 
   const handleChange = (event) => {
@@ -40,9 +45,9 @@ function StudentModal({ onClose, onCreate }) {
     }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    onCreate(form);
+    await onCreate(form);
   };
 
   return (
@@ -153,11 +158,18 @@ function StudentModal({ onClose, onCreate }) {
             <Info size={16} />
             <span>An invitation email with setup instructions will be automatically sent to the student upon creation.</span>
           </div>
+          {errorMessage && (
+            <p className="student-modal-status student-modal-status--error" role="alert">
+              {errorMessage}
+            </p>
+          )}
         </section>
 
         <footer>
-          <button type="button" onClick={onClose}>CANCEL</button>
-          <button type="submit">CREATE STUDENT</button>
+          <button type="button" onClick={onClose} disabled={isSubmitting}>CANCEL</button>
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "CREATING..." : "CREATE STUDENT"}
+          </button>
         </footer>
       </form>
     </div>
@@ -170,7 +182,34 @@ export default function CreateStudent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("All Levels");
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
+  const [submitError, setSubmitError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  const refreshStudentsFromBackend = async () => {
+    try {
+      setLoadError("");
+      const backendStudents = await listStudents();
+
+      setStudents(backendStudents);
+      return true;
+    } catch (error) {
+      if (error?.status === 401) {
+        setLoadError("Your session expired. Please login again.");
+      }
+
+      console.info(
+        `[LearnUp] Student list backend refresh skipped (${error?.status || 0}: ${error?.message || "Unknown error"}).`,
+      );
+    }
+
+    return false;
+  };
+
+  useEffect(() => {
+    refreshStudentsFromBackend();
+  }, []);
 
   const filteredStudents = students.filter((student) => {
     const query = searchTerm.trim().toLowerCase();
@@ -191,13 +230,32 @@ export default function CreateStudent() {
     });
   };
 
-  const handleCreateStudent = (formValues) => {
-    const student = saveStudentRecord(formValues);
-    setStudents(getStudents());
-    setOpen(false);
-    navigate(`/admin/student-created/${encodeRecordId(student.id)}`, {
-      state: { studentId: student.id },
-    });
+  const handleCreateStudent = async (formValues) => {
+    setSubmitError("");
+    setIsSubmitting(true);
+    const payload = toCreateStudentPayload(formValues);
+
+    console.log("CREATE STUDENT SUBMIT CLICKED");
+    console.log("CREATE STUDENT PAYLOAD", payload);
+
+    try {
+      const backendStudent = await createStudentAccount(payload);
+      const student = mapBackendStudent(backendStudent, formValues);
+      const didRefresh = await refreshStudentsFromBackend();
+
+      if (!didRefresh) {
+        setStudents((currentStudents) => [student, ...currentStudents]);
+      }
+
+      setOpen(false);
+      navigate(`/admin/student-created/${encodeRecordId(student.id)}`, {
+        state: { createdStudent: student, studentId: student.id },
+      });
+    } catch (error) {
+      setSubmitError(error?.message || "Student could not be created. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -235,6 +293,12 @@ export default function CreateStudent() {
               </select>
             </label>
           </section>
+
+          {loadError && (
+            <p className="student-page-status student-page-status--error" role="alert">
+              {loadError}
+            </p>
+          )}
 
           <section className="student-table-card">
             <table>
@@ -285,12 +349,26 @@ export default function CreateStudent() {
             </footer>
           </section>
 
-          <button type="button" className="create-student-cta" onClick={() => setOpen(true)}>
+          <button
+            type="button"
+            className="create-student-cta"
+            onClick={() => {
+              setSubmitError("");
+              setOpen(true);
+            }}
+          >
             <UserPlus size={18} /> CREATE NEW STUDENT
           </button>
         </main>
       </div>
-      {open && <StudentModal onClose={() => setOpen(false)} onCreate={handleCreateStudent} />}
+      {open && (
+        <StudentModal
+          errorMessage={submitError}
+          isSubmitting={isSubmitting}
+          onClose={() => setOpen(false)}
+          onCreate={handleCreateStudent}
+        />
+      )}
     </div>
   );
 }

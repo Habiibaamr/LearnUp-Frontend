@@ -5,6 +5,7 @@ const FACULTY_STORAGE_KEY = "learnup:facultyMembers";
 const ADMIN_STORAGE_KEY = "learnup:admins";
 const SESSION_STORAGE_KEY = "learnup:session";
 const CURRENT_USER_STORAGE_KEY = "learnup:currentUser";
+const ACCESS_TOKEN_STORAGE_KEY = "learnup_access_token";
 const LAST_CREATED_STUDENT_KEY = "learnup:lastCreatedStudentId";
 const LAST_CREATED_FACULTY_KEY = "learnup:lastCreatedFacultyId";
 const LAST_SELECTED_STUDENT_KEY = "learnup:lastSelectedStudentId";
@@ -784,6 +785,7 @@ export function setCurrentSession(role, payload = {}) {
 export function clearCurrentSession() {
   removeItem(SESSION_STORAGE_KEY);
   removeItem(CURRENT_USER_STORAGE_KEY);
+  removeItem(ACCESS_TOKEN_STORAGE_KEY);
 }
 
 export function resolveStudentForSession(email) {
