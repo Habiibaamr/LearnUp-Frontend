@@ -289,6 +289,34 @@
   color: #dc2626;
 }
 
+.semester-result-status.is-in-progress {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.semester-result-grade.is-in-progress {
+  color: #4f46e5;
+}
+
+.semester-result-course-icon.is-in-progress {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.semester-result-status.is-not-started {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.semester-result-grade.is-not-started {
+  color: #6b7280;
+}
+
+.semester-result-course-icon.is-not-started {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
 .semester-result-empty {
   min-height: 240px;
   display: grid;

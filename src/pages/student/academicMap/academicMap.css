@@ -128,6 +128,7 @@
 
 .academic-map-card.is-passed { border-left-color: #f4b400; }
 .academic-map-card.is-enrolled { border-left-color: #b8c1ff; }
+.academic-map-card.is-available { border-left-color: #93c5fd; }
 .academic-map-card.is-locked { border-left-color: #ffb8b8; }
 
 .academic-map-card__top {
@@ -154,6 +155,11 @@
 .academic-map-card.is-enrolled .academic-map-card__top span {
   background: #eef2ff;
   color: #5962d9;
+}
+
+.academic-map-card.is-available .academic-map-card__top span {
+  background: #dbeafe;
+  color: #2563eb;
 }
 
 .academic-map-card.is-locked .academic-map-card__top span {

@@ -13,11 +13,11 @@ import { apiClient } from "../../../services/apiClient.js";
 import {
   findFacultyById,
   getCurrentSession,
-  getInitials,
   getSelectedFaculty,
   resolveFacultyForSession,
   setSelectedFacultyId,
 } from "../../../utils/learnupRecords.js";
+import { getFacultyInitials } from "../../../utils/adminDisplayHelpers.js";
 import { getDepartmentDisplayName, getFacultyDisplayName } from "../../../utils/instructorDisplay.js";
 import "../../student/profile/studentProfile.css";
 
@@ -473,6 +473,7 @@ export default function FacultyProfile() {
   const [backendLoaded, setBackendLoaded] = useState(false);
   const [backendError, setBackendError] = useState("");
   const [profileNotFound, setProfileNotFound] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const faculty = profileNotFound ? null : backendFaculty || stateFaculty || localFaculty;
   const selectedFacultyId = faculty?.id;
 
@@ -669,7 +670,7 @@ export default function FacultyProfile() {
         <section className="student-profile-hero">
           <div className="student-profile-identity">
             <span className="student-profile-photo student-profile-photo--faculty">
-              {getInitials(facultyName)}
+              {getFacultyInitials(faculty)}
               <i>{faculty.status || "ACTIVE"}</i>
             </span>
             <div>
@@ -678,9 +679,32 @@ export default function FacultyProfile() {
               <a href={`mailto:${faculty.email || ""}`}>{faculty.email || "No email provided"}</a>
             </div>
           </div>
-          <button type="button" className="student-profile-menu" aria-label="More profile actions">
-            <MoreHorizontal size={20} />
-          </button>
+          <div className="student-profile-actions-wrap">
+            <button
+              type="button"
+              className="student-profile-menu"
+              aria-label="More profile actions"
+              onClick={() => setActionsOpen((current) => !current)}
+            >
+              <MoreHorizontal size={20} />
+            </button>
+            {actionsOpen && (
+              <div className="student-profile-action-menu">
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/create-instructor", { state: { editFacultyMember: faculty } })}
+                >
+                  Edit Faculty Member
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/create-instructor", { state: { deleteFacultyMember: faculty } })}
+                >
+                  Delete Faculty Member
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="student-profile-meta" aria-label="Faculty summary">
             <div>

@@ -53,7 +53,7 @@ export default function InstructorProfile() {
   const instructor = {
     fullName: "Dr. Julian Casablancas",
     instructorId: "INST-2024-089",
-    department: "CS",
+    department: "Computer Science",
     faculty: "Engineering & Technology",
     specialization: "Data Science & AI",
     email: "j.casablancas@university.edu",

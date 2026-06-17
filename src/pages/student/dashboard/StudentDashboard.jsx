@@ -11,10 +11,19 @@ import {
   Sparkles,
   UserRoundSearch,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import StudentSidebar from "../../../components/student/StudentSidebar.jsx";
 import StudentTopbar from "../../../components/student/StudentTopbar.jsx";
+import { ACCESS_TOKEN_STORAGE_KEY } from "../../../services/apiClient.js";
+import {
+  fetchCurrentStudentProfile,
+  getStudentDepartmentLabel,
+  getStudentDisplayName,
+  getStudentLevelLabel,
+  persistStudentProfile,
+  readStoredStudentProfile,
+} from "../../../services/studentProfile.js";
 import "./studentDashboard.css";
 
 // Mock course-board preview rows stay in place until student course-board data is wired.
@@ -63,8 +72,71 @@ const rows = [
 
 const tabs = ["All Courses", "Available", "Enrolled", "Locked", "Passed"];
 
+const getStorageItem = (key) => {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const setStorageItem = (key, value) => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage write issues.
+  }
+};
+
+const getNestedValue = (record, path) => {
+  if (!record || !path) {
+    return "";
+  }
+
+  return path.split(".").reduce((current, segment) => {
+    if (current && Object.prototype.hasOwnProperty.call(current, segment)) {
+      return current[segment];
+    }
+
+    return "";
+  }, record);
+};
+
+const getStudentValue = (record, keys) => {
+  const sources = [record, record?.student, record?.user, record?.account].filter(Boolean);
+
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = key.includes(".") ? getNestedValue(source, key) : source?.[key];
+      if (value !== undefined && value !== null && value !== "") {
+        return value;
+      }
+    }
+  }
+
+  return "";
+};
+
+const DEMO_ADVISOR_NAME = "Dr. Amira Mohamed";
+
+const getStudentEmail = (record) => getStudentValue(record, ["email", "user.email"]) || "";
+const getStudentId = (record) => getStudentValue(record, ["university_id", "student_id", "id", "user.university_id", "user.student_id"]) || "";
+const getStudentAdvisor = (record) => {
+  const value = getStudentValue(record, [
+    "advisor_name",
+    "advisor.full_name",
+    "advisorName",
+    "advisor",
+  ]);
+
+  return value || DEMO_ADVISOR_NAME;
+};
+
 export default function StudentDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("All Courses");
+  const [currentStudent, setCurrentStudent] = useState(() => readStoredStudentProfile());
+  const [loadingStudent, setLoadingStudent] = useState(!readStoredStudentProfile());
 
   const filteredRows = useMemo(() => {
     if (activeTab === "All Courses") {
@@ -73,6 +145,62 @@ export default function StudentDashboard() {
 
     return rows.filter((row) => row.tone === activeTab.toLowerCase());
   }, [activeTab]);
+
+  const studentName = getStudentDisplayName(currentStudent);
+  const studentEmail = getStudentEmail(currentStudent);
+  const studentId = getStudentId(currentStudent);
+  const studentDepartment = getStudentDepartmentLabel(currentStudent);
+  const studentLevel = getStudentLevelLabel(currentStudent);
+  const studentAdvisor = getStudentAdvisor(currentStudent);
+
+  useEffect(() => {
+    const token = getStorageItem(ACCESS_TOKEN_STORAGE_KEY);
+
+    if (!token) {
+      persistStudentProfile(null);
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadStudentProfile() {
+      setLoadingStudent(true);
+
+      try {
+        const profile = await fetchCurrentStudentProfile(readStoredStudentProfile() || {});
+
+        if (isMounted) {
+          setCurrentStudent(profile);
+          persistStudentProfile(profile);
+        }
+      } catch (error) {
+        if (error?.status === 401) {
+          persistStudentProfile(null);
+          setStorageItem(ACCESS_TOKEN_STORAGE_KEY, "");
+          if (isMounted) {
+            navigate("/login", { replace: true });
+          }
+          return;
+        }
+
+        const storedStudent = readStoredStudentProfile();
+        if (isMounted && storedStudent) {
+          setCurrentStudent(storedStudent);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingStudent(false);
+        }
+      }
+    }
+
+    loadStudentProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
 
   return (
     <div className="student-app-shell student-dashboard-page">
@@ -84,7 +212,7 @@ export default function StudentDashboard() {
         <main className="student-dashboard-main">
           <section className="student-dashboard-hero">
             <div>
-              <h1>Welcome back, Alex Rivera</h1>
+              <h1>{loadingStudent ? "Welcome back" : `Welcome back, ${studentName}`}</h1>
               <p>Your academic journey is on track. Here&apos;s your current status.</p>
             </div>
             <span className="student-dashboard-hero__term">ACTIVE TERM</span>
@@ -98,9 +226,9 @@ export default function StudentDashboard() {
                   <Camera size={14} />
                 </button>
               </div>
-              <h2>Alex Rivera</h2>
-              <p>CS - AI</p>
-              <p>level 200</p>
+              <h2>{studentName}</h2>
+              <p>{studentDepartment}</p>
+              <p>{studentLevel}</p>
 
               <div className="student-profile-card-v2__line" />
               <dl>
@@ -108,14 +236,21 @@ export default function StudentDashboard() {
                   <span><UserRoundSearch size={17} /></span>
                   <div>
                     <dt>Academic Advisor</dt>
-                    <dd>Dr. Amira Ahmed</dd>
+                    <dd>{studentAdvisor}</dd>
                   </div>
                 </div>
                 <div>
                   <span><AtSign size={17} /></span>
                   <div>
                     <dt>Student ID</dt>
-                    <dd>#CS-225140</dd>
+                    <dd>{studentId || "Student ID not provided"}</dd>
+                  </div>
+                </div>
+                <div>
+                  <span><AtSign size={17} /></span>
+                  <div>
+                    <dt>Email</dt>
+                    <dd>{studentEmail || "Email not provided"}</dd>
                   </div>
                 </div>
               </dl>

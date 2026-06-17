@@ -1,9 +1,79 @@
 import { Bell, CircleHelp, MessageSquare, Search, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ACCESS_TOKEN_STORAGE_KEY } from "../../services/apiClient.js";
+import {
+  fetchCurrentStudentProfile,
+  getStudentDisplayName,
+  getStudentTopbarLevelLabel,
+  persistStudentProfile,
+  readStoredStudentProfile,
+} from "../../services/studentProfile.js";
 import "./studentShell.css";
+
+const getStorageItem = (key) => {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const setStorageItem = (key, value) => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage write issues.
+  }
+};
 
 export default function StudentTopbar({ dashboardTabs = false }) {
   const navigate = useNavigate();
+  const [currentStudent, setCurrentStudent] = useState(() => readStoredStudentProfile());
+
+  useEffect(() => {
+    const token = getStorageItem(ACCESS_TOKEN_STORAGE_KEY);
+
+    if (!token) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadCurrentStudent() {
+      try {
+        const profile = await fetchCurrentStudentProfile(readStoredStudentProfile() || {});
+        if (isMounted) {
+          setCurrentStudent(profile);
+          persistStudentProfile(profile);
+        }
+      } catch (error) {
+        if (error?.status === 401) {
+          setStorageItem(ACCESS_TOKEN_STORAGE_KEY, "");
+          persistStudentProfile(null);
+          if (isMounted) {
+            navigate("/login", { replace: true });
+          }
+          return;
+        }
+
+        const storedStudent = readStoredStudentProfile();
+        if (isMounted && storedStudent) {
+          setCurrentStudent(storedStudent);
+        }
+      }
+    }
+
+    loadCurrentStudent();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
+
+  const displayName = getStudentDisplayName(currentStudent);
+  const levelLabel = getStudentTopbarLevelLabel(currentStudent);
 
   return (
     <header className={`student-topbar-v2 ${dashboardTabs ? "student-topbar-v2--dashboard" : ""}`}>
@@ -46,10 +116,10 @@ export default function StudentTopbar({ dashboardTabs = false }) {
         )}
         <button type="button" className="student-topbar-v2__user" onClick={() => navigate("/student/profile")}>
           <div>
-            <strong>Alex Rivera</strong>
-            <span>LEVEL 200</span>
+            <strong>{displayName}</strong>
+            <span>{levelLabel}</span>
           </div>
-          <span className="student-topbar-v2__avatar" aria-label="Alex Rivera" role="img" />
+          <span className="student-topbar-v2__avatar" aria-label={displayName} role="img" />
         </button>
       </div>
     </header>

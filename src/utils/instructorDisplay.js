@@ -1,20 +1,20 @@
-const DEMO_INSTRUCTOR_NAMES = [
-  "Dr. Amira Ahmed",
-  "Dr. Mohamed Hassan",
-  "Dr. Mona Ali",
-  "Dr. Karim Samir",
-  "Dr. Salma Ibrahim",
-  "Dr. Ahmed Nabil",
-  "Dr. Rana Mostafa",
-  "Dr. Youssef Adel",
-  "Dr. Nour Khaled",
-  "Dr. Tarek Mahmoud",
-  "Dr. Hany Farouk",
-  "Dr. Mai Samir",
-  "Dr. Sherif Galal",
-  "Dr. Dina Adel",
-  "Dr. Khaled Mansour",
-];
+import {
+  getFacultyDepartmentName,
+  getFacultyDisplayName as getStableFacultyDisplayName,
+  getStableInstructorKey,
+  isDummyInstructor,
+  normalizeInstructorForDisplay,
+} from "./adminDisplayHelpers.js";
+import {
+  DEPARTMENT_NOT_SPECIFIED,
+  getDepartmentDisplayName as resolveDepartmentDisplayName,
+} from "./departments.js";
+export {
+  DEPARTMENT_FILTER_OPTIONS,
+  DEPARTMENT_NOT_SPECIFIED,
+  DEPARTMENT_OPTIONS,
+  getDepartmentIdFromValue,
+} from "./departments.js";
 
 const DEMO_EMAIL_PATTERN = /^user\d+@learnup\.edu$/i;
 const DEMO_NAME_PATTERN = /^User\s+\d+\s+Full\s+Name$/i;
@@ -63,6 +63,12 @@ const cleanDisplayValue = (value) => {
 };
 
 export function getDepartmentDisplayName(item, fallbackIndex = 0) {
+  const facultyDepartment = getFacultyDepartmentName(item);
+
+  if (facultyDepartment && facultyDepartment !== DEPARTMENT_NOT_SPECIFIED) {
+    return facultyDepartment;
+  }
+
   return resolveDepartmentDisplayName(item, fallbackIndex) || DEPARTMENT_NOT_SPECIFIED;
 }
 
@@ -105,26 +111,6 @@ const toBoolean = (value) => {
   return null;
 };
 
-const getInstructorNumericId = (record) => {
-  const rawId =
-    record?.backendInstructorId ??
-    record?.instructorId ??
-    record?.instructor_id ??
-    record?.user_id ??
-    record?.universityId ??
-    record?.university_id ??
-    record?.id;
-  const numericId = Number(rawId);
-
-  if (Number.isFinite(numericId)) {
-    return numericId;
-  }
-
-  const numericMatch = cleanText(rawId).match(/\d+/);
-
-  return numericMatch ? Number(numericMatch[0]) : null;
-};
-
 const getInstructorIdentity = (record) => {
   const source = record?.instructor || record?.user || record?.account || record || {};
   const user = record?.user || source.user || {};
@@ -154,6 +140,10 @@ const getInstructorIdentity = (record) => {
 };
 
 export function isDemoInstructorRecord(record) {
+  if (isDummyInstructor(record)) {
+    return true;
+  }
+
   const seedFlag = toBoolean(record?.isSeed ?? record?.is_seed ?? record?.seed ?? record?.is_demo ?? record?.demo);
   const createdByAdminId = cleanText(record?.createdByAdminId || record?.created_by_admin_id);
 
@@ -187,29 +177,34 @@ export function isDemoInstructorRecord(record) {
   return hasSeedEmail || hasSeedName || hasDemoUniversityId;
 }
 
-export function getDemoInstructorDisplayName(record, fallbackIndex = 0) {
-  const numericId = getInstructorNumericId(record);
-  const stableIndex = numericId === null ? fallbackIndex : numericId - 1;
-
-  return DEMO_INSTRUCTOR_NAMES[Math.abs(stableIndex) % DEMO_INSTRUCTOR_NAMES.length];
+export function getDemoInstructorDisplayName(record) {
+  return getStableFacultyDisplayName(record);
 }
 
 export function decorateInstructorDisplay(record, fallbackIndex = 0) {
   const rawName = cleanText(record.rawName || record.full_name || record.fullName || record.name);
   const isDemoInstructor = isDemoInstructorRecord({ ...record, rawName });
   const displayName = isDemoInstructor
-    ? getDemoInstructorDisplayName(record, fallbackIndex)
+    ? getDemoInstructorDisplayName(record)
     : rawName || "Unnamed Faculty Member";
-
-  return {
+  const normalizedRecord = normalizeInstructorForDisplay({
     ...record,
     rawName,
-    displayName,
-    display_name: displayName,
     name: displayName,
     fullName: displayName,
-    label: [displayName, cleanText(record.email)].filter(Boolean).join(" - "),
+    department: getFacultyDepartmentName({ ...record, rawName }),
+  });
+
+  return {
+    ...normalizedRecord,
+    rawName,
+    displayName: normalizedRecord.displayName,
+    display_name: normalizedRecord.displayName,
+    name: normalizedRecord.displayName,
+    fullName: normalizedRecord.displayName,
+    label: [normalizedRecord.displayName, cleanText(record.email)].filter(Boolean).join(" - "),
     isDemoInstructor,
+    stableInstructorKey: getStableInstructorKey(record),
     sortIndex: Number.isFinite(Number(record.sortIndex)) ? Number(record.sortIndex) : fallbackIndex,
   };
 }
@@ -249,16 +244,12 @@ export function sortInstructorsForDemo(instructors) {
       }
     }
 
+    if (first.isDemoInstructor && second.isDemoInstructor) {
+      return cleanText(first.stableInstructorKey || first.email || first.id).localeCompare(
+        cleanText(second.stableInstructorKey || second.email || second.id),
+      );
+    }
+
     return (first.sortIndex || 0) - (second.sortIndex || 0);
   });
 }
-import {
-  DEPARTMENT_NOT_SPECIFIED,
-  getDepartmentDisplayName as resolveDepartmentDisplayName,
-} from "./departments.js";
-export {
-  DEPARTMENT_FILTER_OPTIONS,
-  DEPARTMENT_NOT_SPECIFIED,
-  DEPARTMENT_OPTIONS,
-  getDepartmentIdFromValue,
-} from "./departments.js";

@@ -93,9 +93,27 @@ function LoginPage() {
       setLoginError("");
       try {
         localStorage.setItem("learnup_access_token", backendLogin.access_token);
+        if (backendLogin.user || backendLogin.current_user || backendLogin.account || backendLogin.profile) {
+          localStorage.setItem(
+            "learnup_current_user",
+            JSON.stringify(
+              backendLogin.user || backendLogin.current_user || backendLogin.account || backendLogin.profile,
+            ),
+          );
+        }
       } catch {
         // If localStorage is unavailable, the session object below still preserves login state.
       }
+
+      try {
+        const meResponse = await apiClient.get("/auth/me");
+        if (meResponse) {
+          localStorage.setItem("learnup_current_user", JSON.stringify(meResponse));
+        }
+      } catch {
+        // Fall back to the login payload if /auth/me is unavailable.
+      }
+
       setCurrentSession(appRole, {
         email: backendLogin.email || email,
         name: backendLogin.full_name || backendLogin.name || email,

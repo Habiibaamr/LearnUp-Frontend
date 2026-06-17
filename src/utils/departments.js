@@ -1,10 +1,10 @@
 export const DEPARTMENT_NOT_SPECIFIED = "Department not specified";
 
 export const DEPARTMENT_OPTIONS = [
-  { id: 1, label: "AI", name: "Artificial Intelligence", code: "AI" },
+  { id: 1, label: "Artificial Intelligence", name: "Artificial Intelligence", code: "AI" },
   { id: 2, label: "Information System", name: "Information System", code: "IS" },
   { id: 3, label: "Cyber Security", name: "Cyber Security", code: "CY" },
-  { id: 4, label: "CS", name: "Computer Science", code: "CS" },
+  { id: 4, label: "Computer Science", name: "Computer Science", code: "CS" },
 ];
 
 export const DEPARTMENT_FILTER_OPTIONS = [
@@ -23,11 +23,13 @@ const DEPARTMENT_BY_ALIAS = new Map(
 
 [
   ["artificial intelligence department", 1],
+  ["ai", 1],
   ["information systems", 2],
   ["information system department", 2],
   ["cybersecurity", 3],
   ["cyber security department", 3],
   ["computer science & it", 4],
+  ["cs", 4],
   ["computer science and it", 4],
   ["computer science it", 4],
   ["computer science department", 4],

@@ -53,7 +53,7 @@ export default function InstructorSuccessPage() {
           <div className="instructor-success-details">
             <div><span>FULL NAME</span><strong>{faculty?.name || "New Faculty Member"}</strong></div>
             <div><span>FACULTY MEMBER ID</span><strong>{faculty?.id || "Pending"}</strong></div>
-            <div><span>DEPARTMENT</span><strong>{faculty?.department || "Pending"}</strong></div>
+            <div><span>DEPARTMENT</span><strong>{faculty?.department || "Department not specified"}</strong></div>
             <div><span>EMAIL</span><strong>{faculty?.email || "Not provided"}</strong></div>
             <div><span>TITLE</span><strong>{faculty?.title || "Not provided"}</strong></div>
             <div><span>COURSE LOAD</span><strong>{faculty?.courseLoad || faculty?.load || "Not provided"}</strong></div>

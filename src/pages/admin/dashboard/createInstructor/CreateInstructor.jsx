@@ -1,22 +1,24 @@
 import { Eye, Info, MoreVertical, Search, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../../components/admin/AdminSidebar.jsx";
 import AdminTopbar from "../../../../components/admin/AdminTopbar.jsx";
 import {
   createInstructorAccount,
+  deleteInstructorAccount,
   isMissingEndpointError,
   listInstructors,
   mapBackendInstructor,
+  updateInstructorAccount,
 } from "../../../../services/adminAccounts.js";
 import {
   encodeRecordId,
   generateFacultyId,
   getFacultyMembers,
-  getInitials,
   saveFacultyRecord,
   setSelectedFacultyId,
 } from "../../../../utils/learnupRecords.js";
+import { getFacultyInitials } from "../../../../utils/adminDisplayHelpers.js";
 import { DEPARTMENT_OPTIONS } from "../../../../utils/departments.js";
 import "./createInstructor.css";
 
@@ -36,7 +38,7 @@ const getInitialInstructorForm = () => ({
   nationalId: "",
   initialPassword: "",
   facultyId: generateFacultyId(),
-  department: "AI",
+  department: "Artificial Intelligence",
   faculty: "Engineering & Technology",
   title: "Lecturer",
   role: "Faculty Member",
@@ -46,8 +48,36 @@ const getInitialInstructorForm = () => ({
   status: "AVAILABLE",
 });
 
-function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
-  const [form, setForm] = useState(getInitialInstructorForm);
+const getInstructorBackendId = (instructor) =>
+  instructor?.backendInstructorId || instructor?.instructor_id || instructor?.instructorIdNumeric || instructor?.id;
+
+const instructorToForm = (instructor) => ({
+  ...getInitialInstructorForm(),
+  fullName: instructor?.fullName || instructor?.name || "",
+  email: instructor?.email || "",
+  phone: instructor?.phone || "",
+  gender: instructor?.gender || "Male",
+  nationalId: instructor?.nationalId || "",
+  initialPassword: "",
+  facultyId: instructor?.facultyId || instructor?.id || generateFacultyId(),
+  department: instructor?.department || "Artificial Intelligence",
+  faculty: instructor?.faculty || "Engineering & Technology",
+  title: instructor?.title || instructor?.academicPosition || "Lecturer",
+  role: instructor?.role || "Faculty Member",
+  specialization: instructor?.specialization || "",
+  location: instructor?.location || instructor?.office_location || "",
+  assignedCourses: Array.isArray(instructor?.assignedCourses)
+    ? instructor.assignedCourses.join(", ")
+    : instructor?.assignedCourses || "",
+  status: instructor?.status || "AVAILABLE",
+});
+
+function InstructorModal({ errorMessage, initialForm, isEditMode = false, isSubmitting, onClose, onCreate }) {
+  const [form, setForm] = useState(() => initialForm || getInitialInstructorForm());
+
+  useEffect(() => {
+    setForm(initialForm || getInitialInstructorForm());
+  }, [initialForm]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -68,8 +98,8 @@ function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
         <button type="button" className="instructor-create-modal__close" onClick={onClose} aria-label="Close">
           <X size={20} />
         </button>
-        <h2>Create New Faculty Member</h2>
-        <p>Enroll a new member to the academic portal</p>
+        <h2>{isEditMode ? "Edit Faculty Member" : "Create New Faculty Member"}</h2>
+        <p>{isEditMode ? "Update faculty member information in the academic portal" : "Enroll a new member to the academic portal"}</p>
 
         <section>
           <h3><span>P</span> PERSONAL INFORMATION</h3>
@@ -128,7 +158,7 @@ function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
                   onChange={handleChange}
                   placeholder="Temporary password"
                   type="password"
-                  required
+                  required={!isEditMode}
                 />
                 <Eye size={15} />
               </div>
@@ -223,7 +253,9 @@ function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
         <footer>
           <button type="button" onClick={onClose} disabled={isSubmitting}>CANCEL</button>
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "CREATING..." : "CREATE FACULTY MEMBER"}
+            {isSubmitting
+              ? (isEditMode ? "SAVING..." : "CREATING...")
+              : (isEditMode ? "SAVE FACULTY MEMBER" : "CREATE FACULTY MEMBER")}
           </button>
         </footer>
       </form>
@@ -235,11 +267,15 @@ export default function CreateInstructor({ initialModalOpen = false }) {
   const [open, setOpen] = useState(initialModalOpen);
   const [searchTerm, setSearchTerm] = useState("");
   const [instructors, setInstructors] = useState(() => getFacultyMembers());
+  const [editingInstructor, setEditingInstructor] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [submitError, setSubmitError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { state } = useLocation();
 
   const refreshInstructorsFromBackend = useCallback(async () => {
     try {
@@ -264,6 +300,18 @@ export default function CreateInstructor({ initialModalOpen = false }) {
   useEffect(() => {
     refreshInstructorsFromBackend();
   }, [refreshInstructorsFromBackend]);
+
+  useEffect(() => {
+    if (state?.editInstructor || state?.editFacultyMember) {
+      setEditingInstructor(state.editInstructor || state.editFacultyMember);
+      setSubmitError("");
+      setOpen(true);
+    }
+
+    if (state?.deleteInstructor || state?.deleteFacultyMember) {
+      setDeleteTarget(state.deleteInstructor || state.deleteFacultyMember);
+    }
+  }, [state]);
 
   const filteredInstructors = instructors.filter((instructor) => {
     const query = searchTerm.trim().toLowerCase();
@@ -351,6 +399,62 @@ export default function CreateInstructor({ initialModalOpen = false }) {
     }
   };
 
+  const handleUpdateInstructor = async (formValues) => {
+    const instructorId = getInstructorBackendId(editingInstructor);
+
+    if (!instructorId) {
+      setSubmitError("Faculty member could not be updated because its backend ID is missing.");
+      return;
+    }
+
+    setSubmitError("");
+    setIsSubmitting(true);
+
+    try {
+      const backendInstructor = await updateInstructorAccount(instructorId, formValues);
+      const mappedInstructor = mapBackendInstructor(backendInstructor, { ...editingInstructor, ...formValues });
+      const didRefresh = await refreshInstructorsFromBackend();
+
+      if (!didRefresh) {
+        setInstructors((currentInstructors) =>
+          currentInstructors.map((instructor) =>
+            String(getInstructorBackendId(instructor)) === String(instructorId) ? mappedInstructor : instructor,
+          ),
+        );
+      }
+
+      setEditingInstructor(null);
+      setOpen(false);
+    } catch (error) {
+      setSubmitError(error?.message || "Faculty member could not be updated. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteInstructor = async () => {
+    const instructorId = getInstructorBackendId(deleteTarget);
+
+    if (!instructorId) {
+      setLoadError("Faculty member could not be deleted because its backend ID is missing.");
+      setDeleteTarget(null);
+      return;
+    }
+
+    try {
+      await deleteInstructorAccount(instructorId);
+      setInstructors((currentInstructors) =>
+        currentInstructors.filter((instructor) => String(getInstructorBackendId(instructor)) !== String(instructorId)),
+      );
+      await refreshInstructorsFromBackend();
+    } catch (error) {
+      setLoadError(error?.message || "Faculty member could not be deleted. Please try again.");
+    } finally {
+      setDeleteTarget(null);
+      setOpenMenuId("");
+    }
+  };
+
   return (
     <div className="admin-app-shell create-instructor-page-v2">
       <AdminSidebar />
@@ -396,7 +500,7 @@ export default function CreateInstructor({ initialModalOpen = false }) {
                       className="instructor-table-row"
                     >
                       <td>
-                        <span className="admin-person-avatar">{getInitials(instructor.name)}</span>
+                        <span className="admin-person-avatar">{getFacultyInitials(instructor)}</span>
                         <div><strong>{instructor.name}</strong><small>{instructor.email || "No email provided"}</small></div>
                       </td>
                       <td>{instructor.id}</td>
@@ -405,7 +509,7 @@ export default function CreateInstructor({ initialModalOpen = false }) {
                         <small>{instructor.role}</small>
                       </td>
                       <td><span className="instructor-dept-pill">{instructor.department}</span></td>
-                      <td>
+                      <td className="instructor-actions-cell">
                         <button
                           type="button"
                           className="instructor-view-profile"
@@ -414,8 +518,47 @@ export default function CreateInstructor({ initialModalOpen = false }) {
                             openInstructorProfile(instructor);
                           }}
                         >
-                          View Profile <MoreVertical size={14} />
+                          View Profile
                         </button>
+                        <span className="instructor-row-menu-wrap">
+                          <button
+                            type="button"
+                            className="instructor-row-menu-button"
+                            aria-label={`Actions for ${instructor.name}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setOpenMenuId((current) => current === instructor.id ? "" : instructor.id);
+                            }}
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+                          {openMenuId === instructor.id && (
+                            <span className="instructor-row-menu">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setEditingInstructor(instructor);
+                                  setSubmitError("");
+                                  setOpen(true);
+                                  setOpenMenuId("");
+                                }}
+                              >
+                                Edit Faculty Member
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setDeleteTarget(instructor);
+                                  setOpenMenuId("");
+                                }}
+                              >
+                                Delete Faculty Member
+                              </button>
+                            </span>
+                          )}
+                        </span>
                       </td>
                     </tr>
                 ))}
@@ -442,6 +585,7 @@ export default function CreateInstructor({ initialModalOpen = false }) {
               <button
                 type="button"
                 onClick={() => {
+                  setEditingInstructor(null);
                   setSubmitError("");
                   setOpen(true);
                 }}
@@ -455,10 +599,28 @@ export default function CreateInstructor({ initialModalOpen = false }) {
       {open && (
         <InstructorModal
           errorMessage={submitError}
+          initialForm={editingInstructor ? instructorToForm(editingInstructor) : undefined}
+          isEditMode={Boolean(editingInstructor)}
           isSubmitting={isSubmitting}
-          onClose={() => setOpen(false)}
-          onCreate={handleCreateInstructor}
+          onClose={() => {
+            setOpen(false);
+            setEditingInstructor(null);
+          }}
+          onCreate={editingInstructor ? handleUpdateInstructor : handleCreateInstructor}
         />
+      )}
+      {deleteTarget && (
+        <div className="instructor-modal-overlay">
+          <section className="instructor-confirm-modal" role="dialog" aria-modal="true">
+            <h2>Delete Faculty Member</h2>
+            <p>Are you sure you want to delete this faculty member?</p>
+            <strong>{deleteTarget.name}</strong>
+            <footer>
+              <button type="button" onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button type="button" onClick={handleDeleteInstructor}>Delete Faculty Member</button>
+            </footer>
+          </section>
+        </div>
       )}
     </div>
   );

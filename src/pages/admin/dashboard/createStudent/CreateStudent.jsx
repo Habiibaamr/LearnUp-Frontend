@@ -1,13 +1,15 @@
-import { Eye, Info, Search, UserPlus, X } from "lucide-react";
+import { Eye, Info, MoreVertical, Search, UserPlus, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../../components/admin/AdminSidebar.jsx";
 import AdminTopbar from "../../../../components/admin/AdminTopbar.jsx";
 import {
   createStudentAccount,
+  deleteStudentAccount,
   listStudents,
   mapBackendStudent,
   toCreateStudentPayload,
+  updateStudentAccount,
 } from "../../../../services/adminAccounts.js";
 import {
   encodeRecordId,
@@ -33,11 +35,34 @@ const getInitialStudentForm = () => ({
   initialPassword: "",
   studentId: generateStudentId(),
   level: "Level 1",
-  department: "AI",
+  department: "Artificial Intelligence",
 });
 
-function StudentModal({ errorMessage, isSubmitting, onClose, onCreate }) {
-  const [form, setForm] = useState(getInitialStudentForm);
+const getStudentBackendId = (student) =>
+  student?.backendStudentId || student?.student_id || student?.studentIdNumeric || student?.userId || student?.user_id || student?.id;
+
+const getStudentProfileId = (student) =>
+  student?.backendStudentId || student?.student_id || student?.userId || student?.user_id || student?.universityId || student?.id;
+
+const studentToForm = (student) => ({
+  ...getInitialStudentForm(),
+  fullName: student?.fullName || student?.name || "",
+  email: student?.email || "",
+  phone: student?.phone || "",
+  gender: student?.gender || "Male",
+  nationalId: student?.nationalId || "",
+  initialPassword: "",
+  studentId: student?.studentId || student?.id || generateStudentId(),
+  level: student?.level || "Level 1",
+  department: student?.department || "Artificial Intelligence",
+});
+
+function StudentModal({ errorMessage, initialForm, isEditMode = false, isSubmitting, onClose, onCreate }) {
+  const [form, setForm] = useState(() => initialForm || getInitialStudentForm());
+
+  useEffect(() => {
+    setForm(initialForm || getInitialStudentForm());
+  }, [initialForm]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -58,8 +83,8 @@ function StudentModal({ errorMessage, isSubmitting, onClose, onCreate }) {
         <button type="button" className="student-create-modal__close" onClick={onClose} aria-label="Close">
           <X size={20} />
         </button>
-        <h2>Create New Student</h2>
-        <p>Enroll a new member to the academic portal</p>
+        <h2>{isEditMode ? "Edit Student" : "Create New Student"}</h2>
+        <p>{isEditMode ? "Update student information in the academic portal" : "Enroll a new member to the academic portal"}</p>
 
         <section>
           <h3><span>P</span> PERSONAL INFORMATION</h3>
@@ -118,7 +143,7 @@ function StudentModal({ errorMessage, isSubmitting, onClose, onCreate }) {
                   onChange={handleChange}
                   placeholder="Temporary password"
                   type="password"
-                  required
+                  required={!isEditMode}
                 />
                 <Eye size={15} />
               </div>
@@ -170,7 +195,7 @@ function StudentModal({ errorMessage, isSubmitting, onClose, onCreate }) {
         <footer>
           <button type="button" onClick={onClose} disabled={isSubmitting}>CANCEL</button>
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "CREATING..." : "CREATE STUDENT"}
+            {isSubmitting ? (isEditMode ? "SAVING..." : "CREATING...") : (isEditMode ? "SAVE STUDENT" : "CREATE STUDENT")}
           </button>
         </footer>
       </form>
@@ -181,6 +206,9 @@ function StudentModal({ errorMessage, isSubmitting, onClose, onCreate }) {
 export default function CreateStudent() {
   const [open, setOpen] = useState(false);
   const [students, setStudents] = useState(() => getStudents());
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("All Levels");
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
@@ -189,6 +217,7 @@ export default function CreateStudent() {
   const [loadError, setLoadError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { state } = useLocation();
 
   const refreshStudentsFromBackend = async () => {
     try {
@@ -213,6 +242,18 @@ export default function CreateStudent() {
   useEffect(() => {
     refreshStudentsFromBackend();
   }, []);
+
+  useEffect(() => {
+    if (state?.editStudent) {
+      setEditingStudent(state.editStudent);
+      setSubmitError("");
+      setOpen(true);
+    }
+
+    if (state?.deleteStudent) {
+      setDeleteTarget(state.deleteStudent);
+    }
+  }, [state]);
 
   const filteredStudents = students.filter((student) => {
     const query = searchTerm.trim().toLowerCase();
@@ -242,9 +283,11 @@ export default function CreateStudent() {
   }, [totalPages]);
 
   const openStudentProfile = (student) => {
+    const profileId = getStudentProfileId(student);
+
     setSelectedStudentId(student.id);
-    navigate(`/admin/student/profile/${encodeRecordId(student.id)}`, {
-      state: { studentId: student.id },
+    navigate(`/admin/student/profile/${encodeRecordId(profileId)}`, {
+      state: { studentId: profileId, student },
     });
   };
 
@@ -273,6 +316,62 @@ export default function CreateStudent() {
       setSubmitError(error?.message || "Student could not be created. Please try again.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateStudent = async (formValues) => {
+    const studentId = getStudentBackendId(editingStudent);
+
+    if (!studentId) {
+      setSubmitError("Student could not be updated because its backend ID is missing.");
+      return;
+    }
+
+    setSubmitError("");
+    setIsSubmitting(true);
+
+    try {
+      const backendStudent = await updateStudentAccount(studentId, formValues);
+      const updatedStudent = mapBackendStudent(backendStudent, { ...editingStudent, ...formValues });
+      const didRefresh = await refreshStudentsFromBackend();
+
+      if (!didRefresh) {
+        setStudents((currentStudents) =>
+          currentStudents.map((student) =>
+            String(getStudentBackendId(student)) === String(studentId) ? updatedStudent : student,
+          ),
+        );
+      }
+
+      setEditingStudent(null);
+      setOpen(false);
+    } catch (error) {
+      setSubmitError(error?.message || "Student could not be updated. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    const studentId = getStudentBackendId(deleteTarget);
+
+    if (!studentId) {
+      setLoadError("Student could not be deleted because its backend ID is missing.");
+      setDeleteTarget(null);
+      return;
+    }
+
+    try {
+      await deleteStudentAccount(studentId);
+      setStudents((currentStudents) =>
+        currentStudents.filter((student) => String(getStudentBackendId(student)) !== String(studentId)),
+      );
+      await refreshStudentsFromBackend();
+    } catch (error) {
+      setLoadError(error?.message || "Student could not be deleted. Please try again.");
+    } finally {
+      setDeleteTarget(null);
+      setOpenMenuId("");
     }
   };
 
@@ -339,7 +438,7 @@ export default function CreateStudent() {
                     <td>{student.id}</td>
                     <td><span className="student-level-pill">{student.level}</span></td>
                     <td>{student.department}</td>
-                    <td>
+                    <td className="student-actions-cell">
                       <button
                         type="button"
                         className="student-view-profile"
@@ -350,6 +449,45 @@ export default function CreateStudent() {
                       >
                         View Profile
                       </button>
+                      <span className="student-row-menu-wrap">
+                        <button
+                          type="button"
+                          className="student-row-menu-button"
+                          aria-label={`Actions for ${student.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMenuId((current) => current === student.id ? "" : student.id);
+                          }}
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                        {openMenuId === student.id && (
+                          <span className="student-row-menu">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setEditingStudent(student);
+                                setSubmitError("");
+                                setOpen(true);
+                                setOpenMenuId("");
+                              }}
+                            >
+                              Edit Student
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDeleteTarget(student);
+                                setOpenMenuId("");
+                              }}
+                            >
+                              Delete Student
+                            </button>
+                          </span>
+                        )}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -381,6 +519,7 @@ export default function CreateStudent() {
             type="button"
             className="create-student-cta"
             onClick={() => {
+              setEditingStudent(null);
               setSubmitError("");
               setOpen(true);
             }}
@@ -392,10 +531,28 @@ export default function CreateStudent() {
       {open && (
         <StudentModal
           errorMessage={submitError}
+          initialForm={editingStudent ? studentToForm(editingStudent) : undefined}
+          isEditMode={Boolean(editingStudent)}
           isSubmitting={isSubmitting}
-          onClose={() => setOpen(false)}
-          onCreate={handleCreateStudent}
+          onClose={() => {
+            setOpen(false);
+            setEditingStudent(null);
+          }}
+          onCreate={editingStudent ? handleUpdateStudent : handleCreateStudent}
         />
+      )}
+      {deleteTarget && (
+        <div className="admin-modal-overlay">
+          <section className="student-confirm-modal" role="dialog" aria-modal="true">
+            <h2>Delete Student</h2>
+            <p>Are you sure you want to delete this student?</p>
+            <strong>{deleteTarget.name}</strong>
+            <footer>
+              <button type="button" onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button type="button" onClick={handleDeleteStudent}>Delete Student</button>
+            </footer>
+          </section>
+        </div>
       )}
     </div>
   );

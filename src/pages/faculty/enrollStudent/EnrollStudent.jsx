@@ -19,7 +19,7 @@ const enrollmentCandidates = [
   {
     name: "Marcus Thorne",
     id: "STD-2023-142",
-    department: "CS",
+    department: "Computer Science",
     level: "Level 4",
     gpa: "3.92",
     status: "Eligible",
@@ -27,7 +27,7 @@ const enrollmentCandidates = [
   {
     name: "Leila Chen",
     id: "STD-2023-055",
-    department: "AI",
+    department: "Artificial Intelligence",
     level: "Level 3",
     gpa: "3.95",
     status: "Already Enrolled",

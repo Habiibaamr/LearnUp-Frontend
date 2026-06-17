@@ -1,71 +1,25 @@
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Lock, MoreHorizontal } from "lucide-react";
 import StudentSidebar from "../../../components/student/StudentSidebar.jsx";
 import StudentTopbar from "../../../components/student/StudentTopbar.jsx";
-import { filterRealisticStudentCourses } from "../../../utils/courseVisibility.js";
+import { fetchCourseBoardData, mergeCourseBoardCatalog } from "../../../services/courseBoard.js";
+import {
+  fetchCurrentStudentProfile,
+  getStudentNumericLevel,
+  readStoredStudentProfile,
+} from "../../../services/studentProfile.js";
+import { buildAcademicMapLevels, getCanonicalCourseCatalog } from "../../../utils/courseBoardLogic.js";
 import "./academicMap.css";
-
-// Mock roadmap levels stay in place until an academic-map/degree-audit endpoint is confirmed.
-const levels = [
-  {
-    level: "100",
-    tone: "passed",
-    courses: [
-      { status: "passed", code: "CS101", title: "Programming 1", meta: "3 Credits • Intro Logic" },
-      { status: "passed", code: "MA105", title: "Discrete Math", meta: "4 Credits • Math Foundation" },
-      { status: "passed", code: "CS102", title: "Programming 2", meta: "3 Credits • Data Flow" },
-      { status: "passed", code: "CS102", title: "OOD 1", meta: "3 Credits • Data Flow" },
-      { status: "passed", code: "CS102", title: "Human Rights", meta: "2 Credits • Data Flow" },
-    ],
-  },
-  {
-    level: "200",
-    tone: "enrolled",
-    courses: [
-      { status: "enrolled", code: "CS201", title: "Data Structures", meta: "3 Credits • Linked Lists & Trees" },
-      { status: "passed", code: "CS202", title: "Architecture", meta: "3 Credits • Von Neumann" },
-      { status: "enrolled", code: "MA201", title: "Linear Algebra", meta: "4 Credits • Vector Spaces" },
-      { status: "enrolled", code: "MA201", title: "OOD 2", meta: "4 Credits • Vector Spaces" },
-      { status: "enrolled", code: "MA201", title: "Scientific thinking", meta: "4 Credits • Vector Spaces" },
-    ],
-  },
-  {
-    level: "300",
-    tone: "current",
-    courses: [
-      { status: "locked", code: "CS301", title: "Algorithms", meta: "3 Credits • Big-O Notation" },
-      { status: "enrolled", code: "CS302", title: "Databases", meta: "3 Credits • SQL & NoSQL" },
-      { status: "locked", code: "CS303", title: "Networks", meta: "4 Credits • TCP/IP" },
-      { status: "locked", code: "CS303", title: "OOD 3", meta: "4 Credits • TCP/IP" },
-    ],
-  },
-  {
-    level: "400",
-    tone: "locked",
-    courses: [
-      { status: "locked", code: "CS401", title: "AI", meta: "3 Credits • Neural Nets" },
-      { status: "locked", code: "CS402", title: "Software Proj.", meta: "4 Credits • Agile Dev" },
-      { status: "locked", code: "CS499", title: "Capstone", meta: "6 Credits • Senior Status" },
-      { status: "locked", code: "CS499", title: "Capstone", meta: "6 Credits • Senior Status" },
-    ],
-  },
-];
-
-const roadmapLevels = levels
-  .map((level) => ({
-    ...level,
-    courses: filterRealisticStudentCourses(level.courses),
-  }))
-  .filter((level) => level.courses.length > 0);
 
 function StatusIcon({ status }) {
   if (status === "passed") return <CheckCircle2 size={17} />;
-  if (status === "enrolled") return <MoreHorizontal size={17} />;
+  if (status === "enrolled" || status === "available") return <MoreHorizontal size={17} />;
   return <Lock size={16} />;
 }
 
-function RoadmapCard({ course, showArrow }) {
+function RoadmapCard({ course }) {
   return (
-    <article className={`academic-map-card is-${course.status} ${showArrow ? "has-arrow" : ""}`}>
+    <article className={`academic-map-card is-${course.status} ${course.showArrow ? "has-arrow" : ""}`}>
       <div className="academic-map-card__top">
         <span>{course.status.toUpperCase()}</span>
         <i><StatusIcon status={course.status} /></i>
@@ -77,6 +31,80 @@ function RoadmapCard({ course, showArrow }) {
 }
 
 export default function AcademicMap() {
+  const [currentStudent, setCurrentStudent] = useState(() => readStoredStudentProfile());
+  const [courses, setCourses] = useState(() => getCanonicalCourseCatalog());
+  const [enrolledCourseCodes, setEnrolledCourseCodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadData() {
+      setLoading(true);
+
+      try {
+        const storedStudent = readStoredStudentProfile();
+
+        if (storedStudent && isMounted) {
+          setCurrentStudent(storedStudent);
+        }
+
+        const profile = await fetchCurrentStudentProfile(storedStudent || {}).catch(
+          () => storedStudent || null,
+        );
+
+        const activeStudent = profile || storedStudent || null;
+
+        if (isMounted && activeStudent) {
+          setCurrentStudent(activeStudent);
+        }
+
+        const boardData = await fetchCourseBoardData(activeStudent).catch(() => ({
+          courses: mergeCourseBoardCatalog([]),
+          enrolledCourseCodes: [],
+        }));
+
+        if (isMounted) {
+          setCourses(boardData.courses.length > 0 ? boardData.courses : mergeCourseBoardCatalog([]));
+          setEnrolledCourseCodes(boardData.enrolledCourseCodes || []);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const studentLevel = useMemo(
+    () =>
+      getStudentNumericLevel(currentStudent) ??
+      getStudentNumericLevel({ level: currentStudent?.student_level }),
+    [currentStudent],
+  );
+
+  const roadmapLevels = useMemo(() => {
+    if (!studentLevel) {
+      return buildAcademicMapLevels({
+        courses,
+        studentLevel: 1,
+        enrolledCourseCodes,
+      });
+    }
+
+    return buildAcademicMapLevels({
+      courses,
+      studentLevel,
+      enrolledCourseCodes,
+    });
+  }, [courses, studentLevel, enrolledCourseCodes]);
+
   return (
     <div className="student-app-shell academic-map-page">
       <StudentSidebar />
@@ -97,23 +125,28 @@ export default function AcademicMap() {
           </section>
 
           <section className="academic-roadmap" aria-label="Academic roadmap">
-            {roadmapLevels.map((level, levelIndex) => (
-              <div className="academic-roadmap-column" key={level.level}>
-                <header>
-                  <span className={`academic-roadmap-column__dot is-${level.tone}`}>{levelIndex + 1}</span>
-                  <h2>Level <br />{level.level}</h2>
-                </header>
-                <div className="academic-roadmap-column__cards">
-                  {level.courses.map((course, index) => (
-                    <RoadmapCard
-                      key={`${level.level}-${course.code}-${course.title}-${index}`}
-                      course={course}
-                      showArrow={levelIndex < roadmapLevels.length - 1 && index < roadmapLevels[levelIndex + 1].courses.length}
-                    />
-                  ))}
+            {loading && roadmapLevels.every((level) => level.courses.length === 0) ? (
+              <p>Loading academic roadmap...</p>
+            ) : (
+              roadmapLevels.map((level) => (
+                <div className="academic-roadmap-column" key={level.level}>
+                  <header>
+                    <span className={`academic-roadmap-column__dot is-${level.tone}`}>
+                      {Number(level.level) / 100}
+                    </span>
+                    <h2>Level <br />{level.level}</h2>
+                  </header>
+                  <div className="academic-roadmap-column__cards">
+                    {level.courses.map((course, index) => (
+                      <RoadmapCard
+                        key={`${level.level}-${course.code}-${index}`}
+                        course={course}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </section>
         </main>
       </div>

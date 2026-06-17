@@ -137,6 +137,13 @@
   gap: 4px;
 }
 
+.student-course-board-card__prereq {
+  margin: 0 18px 10px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .student-course-board-card__body {
   padding: 14px 18px 17px;
 }
@@ -189,6 +196,15 @@
   border-radius: 8px;
   font-size: 12px;
   font-weight: 750;
+}
+
+.student-course-board-card__button.is-available:not(:disabled) {
+  cursor: pointer;
+}
+
+.student-course-board-card__button:disabled {
+  cursor: default;
+  opacity: 0.92;
 }
 
 .student-course-board-card__button.is-available {

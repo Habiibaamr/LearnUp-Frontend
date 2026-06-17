@@ -24,9 +24,17 @@ export default function StudentCreated() {
       return;
     }
 
+    const profileId =
+      student.backendStudentId ||
+      student.student_id ||
+      student.userId ||
+      student.user_id ||
+      student.universityId ||
+      student.id;
+
     setSelectedStudentId(student.id);
-    navigate(`/admin/student/profile/${encodeRecordId(student.id)}`, {
-      state: { studentId: student.id },
+    navigate(`/admin/student/profile/${encodeRecordId(profileId)}`, {
+      state: { studentId: profileId, student },
     });
   };
 
@@ -40,7 +48,7 @@ export default function StudentCreated() {
         <div className="student-created-info">
           <div><span>FULL NAME</span><strong>{student?.name || "New Student"}</strong></div>
           <div><span>STUDENT ID</span><strong>{student?.id || "Pending"}</strong></div>
-          <div><span>DEPARTMENT</span><strong>{student?.department || "Pending"}</strong></div>
+          <div><span>DEPARTMENT</span><strong>{student?.department || "Department not specified"}</strong></div>
           <div><span>EMAIL</span><strong>{student?.email || "Pending"}</strong></div>
           <div><span>PHONE</span><strong>{student?.phone || "Not provided"}</strong></div>
           <div><span>GENDER</span><strong>{student?.gender || "Not provided"}</strong></div>

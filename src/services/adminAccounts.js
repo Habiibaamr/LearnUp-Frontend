@@ -159,6 +159,19 @@ export function toCreateStudentPayload(formValues) {
   };
 }
 
+export function toUpdateStudentPayload(formValues) {
+  return {
+    full_name: clean(formValues.fullName),
+    email: clean(formValues.email),
+    faculty_id: DEMO_FACULTY_ID,
+    department_id: getDepartmentIdFromValue(formValues.department),
+    level: parseLevel(formValues.level) || 1,
+    phone: optionalString(formValues.phone) || DEMO_PHONE,
+    gender: optionalString(formValues.gender),
+    national_id: optionalString(formValues.nationalId),
+  };
+}
+
 export function toCreateInstructorPayload(formValues) {
   return {
     full_name: clean(formValues.fullName),
@@ -174,12 +187,44 @@ export function toCreateInstructorPayload(formValues) {
   };
 }
 
+export function toUpdateInstructorPayload(formValues) {
+  return {
+    full_name: clean(formValues.fullName),
+    email: clean(formValues.email),
+    faculty_id: DEMO_FACULTY_ID,
+    department_id: getDepartmentIdFromValue(formValues.department),
+    specialization: optionalString(formValues.specialization) || "General Computing",
+    office_location: optionalString(formValues.location) || "Campus office pending",
+    phone: optionalString(formValues.phone) || DEMO_PHONE,
+    gender: optionalString(formValues.gender),
+    national_id: optionalString(formValues.nationalId),
+    academic_position: optionalString(formValues.title),
+    role: optionalString(formValues.role),
+  };
+}
+
 export async function createStudentAccount(payload) {
   return apiClient.post("/admin/create-student-account", payload);
 }
 
+export async function updateStudentAccount(studentId, formValues) {
+  return apiClient.put(`/admin/students/${studentId}`, toUpdateStudentPayload(formValues));
+}
+
+export async function deleteStudentAccount(studentId) {
+  return apiClient.delete(`/admin/students/${studentId}`);
+}
+
 export async function createInstructorAccount(formValues) {
   return apiClient.post("/admin/create-instructor-account", toCreateInstructorPayload(formValues));
+}
+
+export async function updateInstructorAccount(instructorId, formValues) {
+  return apiClient.put(`/admin/instructors/${instructorId}`, toUpdateInstructorPayload(formValues));
+}
+
+export async function deleteInstructorAccount(instructorId) {
+  return apiClient.delete(`/admin/instructors/${instructorId}`);
 }
 
 export function mapBackendStudent(record, fallback = {}, index = 0) {
@@ -228,8 +273,12 @@ export function mapBackendStudent(record, fallback = {}, index = 0) {
     email: clean(getNestedValue(source, ["email"]) || fallback.email),
     id: studentId,
     studentId,
+    student_id: backendStudentId ?? studentId,
     backendStudentId,
+    userId: getFirstNumber(getNestedValue(source, ["user_id"]), getNestedValue(record, ["user_id", "id"])),
+    user_id: getFirstNumber(getNestedValue(source, ["user_id"]), getNestedValue(record, ["user_id", "id"])),
     universityId: studentId,
+    department_id: getFirstNumber(getNestedValue(source, ["department_id"]), getNestedValue(record, ["department_id"])),
     isSeed: getNestedValue(source, ["is_seed", "seed", "is_demo", "demo"]) ||
       getNestedValue(record, ["is_seed", "seed", "is_demo", "demo"]),
     createdByAdminId,

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarCheck,
@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { facultyStudents } from "../../../data/facultyStudents.js";
+import { mapBackendStudent } from "../../../services/adminAccounts.js";
+import { apiClient } from "../../../services/apiClient.js";
 import {
   findStudentById,
   getCurrentSession,
@@ -45,6 +47,74 @@ const enrollmentRows = [
 ];
 
 const normalizeKey = (value) => value?.toString().trim().toLowerCase() || "";
+const clean = (value) => value?.toString().trim() || "";
+
+const getArrayPayload = (data, keys) => {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  for (const key of keys) {
+    if (Array.isArray(data?.[key])) {
+      return data[key];
+    }
+  }
+
+  return [];
+};
+
+const getStudentSources = (record) =>
+  [record, record?.student, record?.user, record?.account].filter(Boolean);
+
+const getNumericValue = (record, keys) => {
+  for (const source of getStudentSources(record)) {
+    for (const key of keys) {
+      const numeric = Number(source?.[key]);
+
+      if (Number.isFinite(numeric)) {
+        return numeric;
+      }
+    }
+  }
+
+  return null;
+};
+
+const getUniversityId = (record) => {
+  for (const source of getStudentSources(record)) {
+    const universityId = clean(source.university_id || source.universityId || source.studentId);
+
+    if (universityId) {
+      return universityId;
+    }
+  }
+
+  return "";
+};
+
+const matchesStudentProfileId = (record, profileId) => {
+  const normalizedProfileId = normalizeKey(profileId);
+  const numericProfileId = Number(profileId);
+
+  if (!normalizedProfileId) {
+    return false;
+  }
+
+  if (normalizeKey(getUniversityId(record)) === normalizedProfileId) {
+    return true;
+  }
+
+  if (!Number.isFinite(numericProfileId)) {
+    return false;
+  }
+
+  return ["student_id", "id", "user_id"].some(
+    (key) => getNumericValue(record, [key]) === numericProfileId,
+  );
+};
+
+const getStateStudent = (state) =>
+  state?.student || state?.createdStudent || state?.profileStudent || null;
 
 function findFacultyStudentById(id) {
   const key = normalizeKey(id);
@@ -143,18 +213,97 @@ export default function StudentProfile() {
   const { studentId } = useParams();
   const { state } = useLocation();
   const session = getCurrentSession();
-  const student =
-    findProfileStudent(studentId) ||
-    findProfileStudent(state?.studentId) ||
-    getSelectedStudent() ||
-    resolveStudentForSession(session?.email);
+  const stateStudent = getStateStudent(state);
+  const profileUrlId = decodeURIComponent(clean(studentId || state?.studentId || stateStudent?.backendStudentId || stateStudent?.student_id || stateStudent?.universityId || stateStudent?.id));
+  const localStudent = useMemo(
+    () =>
+      findProfileStudent(profileUrlId) ||
+      findProfileStudent(state?.studentId) ||
+      getSelectedStudent() ||
+      resolveStudentForSession(session?.email),
+    [profileUrlId, session?.email, state?.studentId],
+  );
+  const [backendStudent, setBackendStudent] = useState(null);
+  const [backendLoaded, setBackendLoaded] = useState(false);
+  const [backendError, setBackendError] = useState("");
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const student = backendStudent || stateStudent || localStudent;
   const selectedStudentId = student?.id;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadStudentProfile() {
+      if (!profileUrlId) {
+        setBackendLoaded(true);
+        return;
+      }
+
+      try {
+        setBackendLoaded(false);
+        setBackendError("");
+
+        const response = await apiClient.get("/admin/users");
+        const users = getArrayPayload(response, ["users", "students", "items", "results", "data"]);
+        const studentUsers = users.filter((user) => {
+          const role = clean(user.role || user.user_role || user.type).toLowerCase();
+          return role.includes("student") || user.student_id || user.student || user.level;
+        });
+        const matchedRawStudent = studentUsers.find((candidate) =>
+          matchesStudentProfileId(candidate, profileUrlId),
+        );
+
+        console.log("STUDENT PROFILE URL PARAM", profileUrlId);
+        console.log("ALL STUDENT USERS", studentUsers);
+        console.log("MATCHED STUDENT", matchedRawStudent);
+
+        if (isMounted) {
+          setBackendStudent(matchedRawStudent ? mapBackendStudent(matchedRawStudent, stateStudent || localStudent || {}) : null);
+          setBackendLoaded(true);
+        }
+      } catch (error) {
+        console.info(
+          `[LearnUp] Student profile backend lookup skipped (${error?.status || 0}: ${
+            error?.message || "Unknown error"
+          }).`,
+        );
+
+        if (isMounted) {
+          setBackendError(error?.message || "Student profile could not be loaded.");
+          setBackendLoaded(true);
+        }
+      }
+    }
+
+    loadStudentProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [profileUrlId, stateStudent, localStudent]);
 
   useEffect(() => {
     if (selectedStudentId) {
       setSelectedStudentId(selectedStudentId);
     }
   }, [selectedStudentId]);
+
+  if (!student && !backendLoaded) {
+    return (
+      <main className="student-profile-page">
+        <button type="button" className="student-profile-back" onClick={() => navigate(-1)} aria-label="Go back">
+          <ArrowLeft size={28} />
+        </button>
+        <section className="student-profile-card">
+          <header className="student-profile-header">
+            <span className="student-profile-avatar">ST</span>
+            <h1>Loading Student</h1>
+            <p>Loading profile details</p>
+          </header>
+        </section>
+      </main>
+    );
+  }
 
   const profile = student || {
     name: "Student Profile",
@@ -163,7 +312,7 @@ export default function StudentProfile() {
     department: "Department not specified",
     level: "Pending",
     gpa: "0.00",
-    status: "ACTIVE",
+    status: backendError || "ACTIVE",
   };
   const gpa = parseNumber(profile.gpa, 0);
   const attendance = getAttendance(profile);
@@ -194,9 +343,32 @@ export default function StudentProfile() {
               <a href={`mailto:${profile.email || ""}`}>{profile.email || "No email provided"}</a>
             </div>
           </div>
-          <button type="button" className="student-profile-menu" aria-label="More profile actions">
-            <MoreHorizontal size={20} />
-          </button>
+          <div className="student-profile-actions-wrap">
+            <button
+              type="button"
+              className="student-profile-menu"
+              aria-label="More profile actions"
+              onClick={() => setActionsOpen((current) => !current)}
+            >
+              <MoreHorizontal size={20} />
+            </button>
+            {actionsOpen && (
+              <div className="student-profile-action-menu">
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/create-student", { state: { editStudent: profile } })}
+                >
+                  Edit Student
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/create-student", { state: { deleteStudent: profile } })}
+                >
+                  Delete Student
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="student-profile-meta" aria-label="Student summary">
             <div>

@@ -12,6 +12,7 @@ import {
   notifyFacultyAssignmentsChanged,
 } from "../../../../services/adminAssignments.js";
 import { DEPARTMENT_NOT_SPECIFIED, getDepartmentDisplayName } from "../../../../utils/instructorDisplay.js";
+import { getFacultyInitials } from "../../../../utils/adminDisplayHelpers.js";
 import "./assignInstructor.css";
 
 const PAGE_SIZE = 10;
@@ -99,7 +100,7 @@ export function AssignInstructorModal({
         <button type="button" className="assign-modal__close" onClick={onClose ?? (() => navigate("/admin/assign-instructor"))} aria-label="Close"><X size={18} /></button>
         <h1>Assign Faculty Member to Course</h1>
         <article className="assign-modal-profile">
-          <span className="assign-modal-avatar">{getInitials(currentInstructor?.name)}</span>
+          <span className="assign-modal-avatar">{currentInstructor ? getFacultyInitials(currentInstructor) : "FM"}</span>
           <div>
             <h2>{currentInstructor?.name || "Faculty Member"}</h2>
             <p>{instructorDepartment}</p>
@@ -291,7 +292,7 @@ export default function AssignInstructor() {
         <main className="assign-instructor-main">
           <p className="assign-breadcrumb"><span>Faculty Members</span> &gt; <strong>Assign Faculty Member</strong></p>
           <h1>Select Faculty Member for CS303</h1>
-          <p>Available computer science faculty for the Advanced Algorithms course.</p>
+          <p>Available faculty members for the selected course.</p>
           {successMessage && <p className="assign-page-status assign-page-status--success" role="status">{successMessage}</p>}
           {loadError && <p className="assign-page-status assign-page-status--error" role="alert">{loadError}</p>}
 
@@ -319,7 +320,7 @@ export default function AssignInstructor() {
                       }}
                     >
                       <td>
-                        <span className="admin-person-avatar">{getInitials(instructor.name)}</span>
+                        <span className="admin-person-avatar">{getFacultyInitials(instructor)}</span>
                         <div><strong>{instructor.name}</strong><small>{instructor.email}</small></div>
                       </td>
                       <td>{getDepartmentDisplayName(instructor)}</td>
