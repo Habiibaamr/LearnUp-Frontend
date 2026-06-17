@@ -99,7 +99,7 @@ export default function StudentDashboard() {
                 </button>
               </div>
               <h2>Alex Rivera</h2>
-              <p>Computer Science • Data science</p>
+              <p>CS - AI</p>
               <p>level 200</p>
 
               <div className="student-profile-card-v2__line" />

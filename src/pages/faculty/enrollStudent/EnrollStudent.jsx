@@ -19,7 +19,7 @@ const enrollmentCandidates = [
   {
     name: "Marcus Thorne",
     id: "STD-2023-142",
-    department: "Computer Science",
+    department: "CS",
     level: "Level 4",
     gpa: "3.92",
     status: "Eligible",
@@ -27,7 +27,7 @@ const enrollmentCandidates = [
   {
     name: "Leila Chen",
     id: "STD-2023-055",
-    department: "Software Eng.",
+    department: "AI",
     level: "Level 3",
     gpa: "3.95",
     status: "Already Enrolled",
@@ -35,7 +35,7 @@ const enrollmentCandidates = [
   {
     name: "Alex Smith",
     id: "STD-2023-089",
-    department: "Information Sys.",
+    department: "Information System",
     level: "Level 2",
     gpa: "2.15",
     status: "At Risk",
@@ -43,7 +43,7 @@ const enrollmentCandidates = [
   {
     name: "Elena Rodriguez",
     id: "STD-2023-211",
-    department: "Cybersecurity",
+    department: "Cyber Security",
     level: "Level 4",
     gpa: "3.45",
     status: "Eligible",

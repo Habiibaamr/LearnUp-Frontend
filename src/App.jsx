@@ -102,6 +102,8 @@ export function LearnUpRoutes() {
         <Route path="/admin/student/profile/:studentId" element={requireRole("admin", <StudentProfile />)} />
         <Route path="/admin/faculty/profile" element={requireRole("admin", <FacultyProfile />)} />
         <Route path="/admin/faculty/profile/:facultyId" element={requireRole("admin", <FacultyProfile />)} />
+        <Route path="/admin/faculty-member/:facultyId" element={requireRole("admin", <FacultyProfile />)} />
+        <Route path="/admin/instructor/:facultyId" element={requireRole("admin", <FacultyProfile />)} />
         <Route
           path="/admin/academic-advisor-bot"
           element={requireRole("admin", <Navigate to="/admin/dashboard" replace />)}

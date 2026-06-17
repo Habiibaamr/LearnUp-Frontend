@@ -5,11 +5,16 @@ import AdminSidebar from "../../../../components/admin/AdminSidebar.jsx";
 import AdminTopbar from "../../../../components/admin/AdminTopbar.jsx";
 import {
   assignInstructorToOffering,
+  clearInstructorCourseLoadCache,
+  enrichInstructorsWithCourseLoads,
   listAdminInstructors,
-  listCourseOfferingInstructors,
   listCourseOfferings,
+  notifyFacultyAssignmentsChanged,
 } from "../../../../services/adminAssignments.js";
+import { DEPARTMENT_NOT_SPECIFIED, getDepartmentDisplayName } from "../../../../utils/instructorDisplay.js";
 import "./assignInstructor.css";
+
+const PAGE_SIZE = 10;
 
 const getInitials = (name = "") =>
   name
@@ -20,12 +25,39 @@ const getInitials = (name = "") =>
     .join("")
     .toUpperCase() || "FM";
 
+const getCourseCode = (course) => {
+  if (!course || typeof course !== "object") {
+    return String(course || "").split(/\s+-\s+/)[0].trim();
+  }
+
+  return String(
+    course.course_code ||
+      course.code ||
+      course.course?.course_code ||
+      course.course?.code ||
+      course.label ||
+      "",
+  )
+    .split(/\s+-\s+/)[0]
+    .trim();
+};
+
+const formatCourseCodeSummary = (courses = []) => {
+  const codes = courses.map(getCourseCode).filter(Boolean);
+  const uniqueCodes = codes.filter((code, index) => codes.indexOf(code) === index);
+  const visibleCodes = uniqueCodes.slice(0, 3).join(", ");
+  const hiddenCount = uniqueCodes.length - 3;
+
+  return hiddenCount > 0 ? `${visibleCodes} +${hiddenCount} more` : visibleCodes;
+};
+
 export function AssignInstructorModal({
   assignmentError,
   courseOfferings,
   instructor,
   isSubmitting,
   onAssign,
+  onClearAssignmentError,
   onClose,
 }) {
   const navigate = useNavigate();
@@ -33,6 +65,7 @@ export function AssignInstructorModal({
   const [error, setError] = useState("");
 
   const currentInstructor = instructor;
+  const instructorDepartment = currentInstructor ? getDepartmentDisplayName(currentInstructor) : DEPARTMENT_NOT_SPECIFIED;
   const selectedOffering = courseOfferings.find(
     (offering) => String(offering.courseOfferingId) === selectedCourse,
   );
@@ -69,7 +102,7 @@ export function AssignInstructorModal({
           <span className="assign-modal-avatar">{getInitials(currentInstructor?.name)}</span>
           <div>
             <h2>{currentInstructor?.name || "Faculty Member"}</h2>
-            <p>{currentInstructor?.department || "Department pending"}</p>
+            <p>{instructorDepartment}</p>
             <div className="assign-modal-load">
               <span>COURSES LOAD</span><strong>{currentInstructor?.load || "0/3"}</strong>
               <i><b style={{ width: `${currentInstructor?.progress || 0}%` }} /></i>
@@ -82,8 +115,11 @@ export function AssignInstructorModal({
             <select
               value={selectedCourse}
               onChange={(event) => {
-                setSelectedCourse(event.target.value);
+                const nextCourseOfferingId = event.target.value;
+
+                setSelectedCourse(nextCourseOfferingId);
                 setError("");
+                onClearAssignmentError?.();
               }}
             >
               <option value="">Choose course</option>
@@ -125,8 +161,24 @@ export default function AssignInstructor() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedInstructor, setSelectedInstructor] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
+
+  const refreshInstructorsWithCourseLoads = async () => {
+    const refreshedInstructors = await listAdminInstructors({ includeCourseLoads: false });
+    const enrichedInstructors = await enrichInstructorsWithCourseLoads(refreshedInstructors, courseOfferings);
+
+    setInstructors(enrichedInstructors);
+    setSelectedInstructor((currentInstructor) =>
+      currentInstructor
+        ? enrichedInstructors.find((instructor) => instructor.instructorId === currentInstructor.instructorId) ||
+          currentInstructor
+        : currentInstructor,
+    );
+
+    return enrichedInstructors;
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -137,15 +189,19 @@ export default function AssignInstructor() {
 
       try {
         const [backendInstructors, backendCourseOfferings] = await Promise.all([
-          listAdminInstructors(),
+          listAdminInstructors({ includeCourseLoads: false }),
           listCourseOfferings(),
         ]);
+        const enrichedInstructors = await enrichInstructorsWithCourseLoads(
+          backendInstructors,
+          backendCourseOfferings,
+        );
 
         if (!isMounted) {
           return;
         }
 
-        setInstructors(backendInstructors);
+        setInstructors(enrichedInstructors);
         setCourseOfferings(backendCourseOfferings);
         setSelectedInstructor(null);
       } catch (error) {
@@ -168,6 +224,18 @@ export default function AssignInstructor() {
     };
   }, []);
 
+  const totalPages = Math.max(1, Math.ceil(instructors.length / PAGE_SIZE));
+  const currentPageIndex = Math.min(currentPage, totalPages) - 1;
+  const pageStart = currentPageIndex * PAGE_SIZE;
+  const pageEnd = pageStart + PAGE_SIZE;
+  const paginatedInstructors = instructors.slice(pageStart, pageEnd);
+  const showingStart = instructors.length === 0 ? 0 : pageStart + 1;
+  const showingEnd = Math.min(pageEnd, instructors.length);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
   const handleAssign = async (payload) => {
     setAssignmentError("");
     setSuccessMessage("");
@@ -177,10 +245,11 @@ export default function AssignInstructor() {
       await assignInstructorToOffering(payload);
 
       try {
-        await listCourseOfferingInstructors(payload.course_offering_id);
+        await refreshInstructorsWithCourseLoads();
+        notifyFacultyAssignmentsChanged();
       } catch (error) {
         console.info(
-          `[LearnUp] Assignment verification skipped (${error?.status || 0}: ${error?.message || "Unknown error"}).`,
+          `[LearnUp] Instructor refresh skipped (${error?.status || 0}: ${error?.message || "Unknown error"}).`,
         );
       }
 
@@ -188,7 +257,27 @@ export default function AssignInstructor() {
       setSuccessMessage("Faculty member assigned successfully.");
       setSelectedInstructor(null);
     } catch (error) {
-      setAssignmentError(error?.message || "Faculty member could not be assigned. Please try again.");
+      const message = error?.message || "";
+      const isDuplicateAssignment =
+        error?.status === 400 && /already assigned/i.test(message);
+
+      if (isDuplicateAssignment) {
+        setAssignmentError(message || "This faculty member is already assigned to this course.");
+
+        try {
+          clearInstructorCourseLoadCache();
+          await refreshInstructorsWithCourseLoads();
+          notifyFacultyAssignmentsChanged();
+        } catch (refreshError) {
+          console.info(
+            `[LearnUp] Instructor refresh skipped (${refreshError?.status || 0}: ${
+              refreshError?.message || "Unknown error"
+            }).`,
+          );
+        }
+      } else {
+        setAssignmentError(message || "Faculty member could not be assigned. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -217,7 +306,7 @@ export default function AssignInstructor() {
                 </tr>
               </thead>
               <tbody>
-                {instructors.map((instructor) => {
+                {paginatedInstructors.map((instructor) => {
                   const full = instructor.progress === 100;
                   const selected = selectedInstructor === instructor;
                   return (
@@ -233,7 +322,7 @@ export default function AssignInstructor() {
                         <span className="admin-person-avatar">{getInitials(instructor.name)}</span>
                         <div><strong>{instructor.name}</strong><small>{instructor.email}</small></div>
                       </td>
-                      <td>{instructor.department}</td>
+                      <td>{getDepartmentDisplayName(instructor)}</td>
                       <td>
                         <div className="assign-load-cell">
                           <i><b className={full ? "is-full" : ""} style={{ width: `${instructor.progress}%` }} /></i>
@@ -244,7 +333,9 @@ export default function AssignInstructor() {
                       <td>
                         <div className="assign-course-pills">
                           {instructor.courses.length > 0 ? (
-                            instructor.courses.map((course) => <span key={course}>{course}</span>)
+                            <span title={instructor.courses.join(", ")}>
+                              {formatCourseCodeSummary(instructor.courses)}
+                            </span>
                           ) : (
                             <span>No courses</span>
                           )}
@@ -257,6 +348,28 @@ export default function AssignInstructor() {
             </table>
             {!isLoading && instructors.length === 0 && (
               <p className="assign-empty-state">No faculty members are available.</p>
+            )}
+            {instructors.length > 0 && (
+              <footer className="assign-pagination">
+                <span>Showing {showingStart}-{showingEnd} of {instructors.length} faculty members</span>
+                <div>
+                  <button
+                    type="button"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  >
+                    &lt;
+                  </button>
+                  <button type="button" className="active">{currentPageIndex + 1}</button>
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  >
+                    &gt;
+                  </button>
+                </div>
+              </footer>
             )}
           </section>
 
@@ -283,6 +396,7 @@ export default function AssignInstructor() {
           instructor={selectedInstructor}
           isSubmitting={isSubmitting}
           onAssign={handleAssign}
+          onClearAssignmentError={() => setAssignmentError("")}
           onClose={() => setOpen(false)}
         />
       )}

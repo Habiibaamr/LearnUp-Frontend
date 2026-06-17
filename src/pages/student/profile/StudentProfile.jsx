@@ -17,6 +17,7 @@ import {
   resolveStudentForSession,
   setSelectedStudentId,
 } from "../../../utils/learnupRecords.js";
+import { getDepartmentDisplayName } from "../../../utils/departments.js";
 import "./studentProfile.css";
 
 const enrollmentRows = [
@@ -159,7 +160,7 @@ export default function StudentProfile() {
     name: "Student Profile",
     id: "Pending",
     email: "Not provided",
-    department: "Computer Science",
+    department: "Department not specified",
     level: "Pending",
     gpa: "0.00",
     status: "ACTIVE",
@@ -171,7 +172,7 @@ export default function StudentProfile() {
   const trend = buildTrend(profile.gpa);
   const statusText = profile.status || profile.academicStatus || "ACTIVE";
   const levelText = profile.level || "Pending";
-  const departmentText = profile.department || "Computer Science";
+  const departmentText = getDepartmentDisplayName(profile);
   const firstName = profile.name?.split(" ")[0] || "Student";
 
   return (

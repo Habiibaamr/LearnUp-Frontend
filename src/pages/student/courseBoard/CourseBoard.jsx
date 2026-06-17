@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Clock3, Link2, Sparkles, SquareTerminal } from "lucide-react";
 import StudentSidebar from "../../../components/student/StudentSidebar.jsx";
 import StudentTopbar from "../../../components/student/StudentTopbar.jsx";
+import { filterRealisticStudentCourses } from "../../../utils/courseVisibility.js";
 import "./courseBoard.css";
 
 // Mock course board filters and cards stay in place until student course-board endpoints are wired.
@@ -52,7 +53,7 @@ const templates = {
 const repeat = (course, count) => Array.from({ length: count }, (_, index) => ({ ...course, id: `${course.title}-${index}` }));
 
 const coursesByTab = {
-  all: [
+  all: filterRealisticStudentCourses([
     templates.availableAi,
     templates.enrolledHci,
     templates.lockedAlgorithm,
@@ -61,11 +62,11 @@ const coursesByTab = {
     templates.availableMath,
     templates.enrolledLinear,
     templates.lockedAlgorithm,
-  ].map((course, index) => ({ ...course, id: `all-${index}` })),
-  available: [...repeat(templates.availableAi, 4), ...repeat(templates.availableMath, 4)],
-  enrolled: [...repeat(templates.enrolledHci, 4), ...repeat(templates.enrolledLinear, 4)],
-  locked: repeat(templates.lockedAlgorithm, 8),
-  passed: repeat(templates.passedGraphics, 8),
+  ].map((course, index) => ({ ...course, id: `all-${index}` }))),
+  available: filterRealisticStudentCourses([...repeat(templates.availableAi, 4), ...repeat(templates.availableMath, 4)]),
+  enrolled: filterRealisticStudentCourses([...repeat(templates.enrolledHci, 4), ...repeat(templates.enrolledLinear, 4)]),
+  locked: filterRealisticStudentCourses(repeat(templates.lockedAlgorithm, 8)),
+  passed: filterRealisticStudentCourses(repeat(templates.passedGraphics, 8)),
 };
 
 function CourseCard({ course }) {

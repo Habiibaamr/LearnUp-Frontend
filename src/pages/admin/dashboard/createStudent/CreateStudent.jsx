@@ -16,11 +16,13 @@ import {
   getStudents,
   setSelectedStudentId,
 } from "../../../../utils/learnupRecords.js";
+import { DEPARTMENT_FILTER_OPTIONS, DEPARTMENT_OPTIONS } from "../../../../utils/departments.js";
 import "./createStudent.css";
 
 const levels = ["All Levels", "Level 1", "Level 2", "Level 3", "Level 4"];
-const departments = ["All Departments", "Computer Science", "Artificial Intelligence", "Information Systems", "Cyber Security"];
+const departments = DEPARTMENT_FILTER_OPTIONS;
 const genderOptions = ["Male", "Female"];
+const PAGE_SIZE = 10;
 
 const getInitialStudentForm = () => ({
   fullName: "",
@@ -31,7 +33,7 @@ const getInitialStudentForm = () => ({
   initialPassword: "",
   studentId: generateStudentId(),
   level: "Level 1",
-  department: "Computer Science",
+  department: "AI",
 });
 
 function StudentModal({ errorMessage, isSubmitting, onClose, onCreate }) {
@@ -148,8 +150,8 @@ function StudentModal({ errorMessage, isSubmitting, onClose, onCreate }) {
             <label className="span-2">
               Department
               <select name="department" value={form.department} onChange={handleChange}>
-                {departments.filter((department) => department !== "All Departments").map((department) => (
-                  <option key={department}>{department}</option>
+                {DEPARTMENT_OPTIONS.map((department) => (
+                  <option key={department.id} value={department.label}>{department.label}</option>
                 ))}
               </select>
             </label>
@@ -182,6 +184,7 @@ export default function CreateStudent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("All Levels");
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
+  const [currentPage, setCurrentPage] = useState(1);
   const [submitError, setSubmitError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -222,6 +225,21 @@ export default function CreateStudent() {
     const departmentMatches = selectedDepartment === "All Departments" || student.department === selectedDepartment;
     return matchesQuery && levelMatches && departmentMatches;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+  const currentPageIndex = Math.min(currentPage, totalPages) - 1;
+  const pageStart = currentPageIndex * PAGE_SIZE;
+  const pageEnd = pageStart + PAGE_SIZE;
+  const paginatedStudents = filteredStudents.slice(pageStart, pageEnd);
+  const showingStart = filteredStudents.length === 0 ? 0 : pageStart + 1;
+  const showingEnd = Math.min(pageEnd, filteredStudents.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedLevel, selectedDepartment]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const openStudentProfile = (student) => {
     setSelectedStudentId(student.id);
@@ -312,7 +330,7 @@ export default function CreateStudent() {
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map((student) => (
+                {paginatedStudents.map((student) => (
                   <tr key={student.id} onClick={() => openStudentProfile(student)} className="student-table-row">
                     <td>
                       <span className="student-table-avatar">{getInitials(student.name)}</span>
@@ -338,13 +356,23 @@ export default function CreateStudent() {
               </tbody>
             </table>
             <footer>
-              <span>Showing {filteredStudents.length} of {students.length} students</span>
+              <span>Showing {showingStart}-{showingEnd} of {filteredStudents.length} students</span>
               <div>
-                <button type="button">&lt;</button>
-                <button type="button">2</button>
-                <button type="button" className="active">1</button>
-                <button type="button">3</button>
-                <button type="button">&gt;</button>
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                >
+                  &lt;
+                </button>
+                <button type="button" className="active">{currentPageIndex + 1}</button>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                >
+                  &gt;
+                </button>
               </div>
             </footer>
           </section>

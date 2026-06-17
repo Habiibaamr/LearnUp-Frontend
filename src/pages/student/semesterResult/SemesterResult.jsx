@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { academicYears, resultTerms, semesterResults } from "../../../data/studentSemesterResults.js";
 import StudentSidebar from "../../../components/student/StudentSidebar.jsx";
 import StudentTopbar from "../../../components/student/StudentTopbar.jsx";
+import { filterRealisticStudentCourses } from "../../../utils/courseVisibility.js";
 import "./semesterResult.css";
 
 const tabs = ["All", "Passed", "Failed"];
@@ -27,9 +28,9 @@ const gradePoints = {
 
 function getCoursesForPeriod(academicYear, term) {
   return (
-    semesterResults.find(
+    filterRealisticStudentCourses(semesterResults.find(
       (entry) => entry.academicYear === academicYear && entry.term === term,
-    )?.courses || []
+    )?.courses || [])
   );
 }
 

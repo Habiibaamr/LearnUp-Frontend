@@ -1,5 +1,5 @@
 import { Eye, Info, MoreVertical, Search, UserPlus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminSidebar from "../../../../components/admin/AdminSidebar.jsx";
 import AdminTopbar from "../../../../components/admin/AdminTopbar.jsx";
@@ -17,15 +17,16 @@ import {
   saveFacultyRecord,
   setSelectedFacultyId,
 } from "../../../../utils/learnupRecords.js";
+import { DEPARTMENT_OPTIONS } from "../../../../utils/departments.js";
 import "./createInstructor.css";
 
-const departments = ["Computer Science & IT", "COMPUTER SCIENCE", "Artificial Intelligence", "Information Systems", "Cyber Security"];
-const faculties = ["Engineering & Technology", "Computer Science", "Artificial Intelligence"];
+const departments = DEPARTMENT_OPTIONS;
+const faculties = ["Engineering & Technology"];
 const genderOptions = ["Male", "Female"];
 const titleOptions = ["Teaching Assistant", "Assistant Lecturer", "Lecturer", "Senior Lecturer", "Professor"];
 const roleOptions = ["Faculty Member", "Course Instructor", "Academic Advisor", "Department Coordinator"];
 const statusOptions = ["AVAILABLE", "ACTIVE", "FULL"];
-const courseLoadOptions = ["0/3", "1/3", "2/3", "3/3"];
+const PAGE_SIZE = 10;
 
 const getInitialInstructorForm = () => ({
   fullName: "",
@@ -35,26 +36,15 @@ const getInitialInstructorForm = () => ({
   nationalId: "",
   initialPassword: "",
   facultyId: generateFacultyId(),
-  department: "Computer Science & IT",
+  department: "AI",
   faculty: "Engineering & Technology",
   title: "Lecturer",
   role: "Faculty Member",
   specialization: "",
   location: "",
-  courseLoad: "1/3",
   assignedCourses: "",
   status: "AVAILABLE",
 });
-
-const getLoadProgress = (courseLoad) => {
-  const [current, total] = courseLoad.split("/").map(Number);
-
-  if (!Number.isFinite(current) || !Number.isFinite(total) || total === 0) {
-    return 0;
-  }
-
-  return Math.min(100, Math.round((current / total) * 100));
-};
 
 function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
   const [form, setForm] = useState(getInitialInstructorForm);
@@ -69,11 +59,7 @@ function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    await onCreate({
-      ...form,
-      load: form.courseLoad,
-      progress: getLoadProgress(form.courseLoad),
-    });
+    await onCreate(form);
   };
 
   return (
@@ -166,7 +152,9 @@ function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
             <label>
               Department
               <select name="department" value={form.department} onChange={handleChange}>
-                {departments.map((department) => <option key={department}>{department}</option>)}
+                {departments.map((department) => (
+                  <option key={department.id} value={department.label}>{department.label}</option>
+                ))}
               </select>
             </label>
             <label>
@@ -185,12 +173,6 @@ function InstructorModal({ errorMessage, isSubmitting, onClose, onCreate }) {
               Role
               <select name="role" value={form.role} onChange={handleChange}>
                 {roleOptions.map((role) => <option key={role}>{role}</option>)}
-              </select>
-            </label>
-            <label>
-              Course Load
-              <select name="courseLoad" value={form.courseLoad} onChange={handleChange}>
-                {courseLoadOptions.map((courseLoad) => <option key={courseLoad}>{courseLoad}</option>)}
               </select>
             </label>
             <label>
@@ -253,15 +235,16 @@ export default function CreateInstructor({ initialModalOpen = false }) {
   const [open, setOpen] = useState(initialModalOpen);
   const [searchTerm, setSearchTerm] = useState("");
   const [instructors, setInstructors] = useState(() => getFacultyMembers());
+  const [currentPage, setCurrentPage] = useState(1);
   const [submitError, setSubmitError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  const refreshInstructorsFromBackend = async () => {
+  const refreshInstructorsFromBackend = useCallback(async () => {
     try {
       setLoadError("");
-      const backendInstructors = await listInstructors();
+      const backendInstructors = await listInstructors({ includeCourseLoads: false });
 
       setInstructors(backendInstructors);
       return true;
@@ -276,11 +259,11 @@ export default function CreateInstructor({ initialModalOpen = false }) {
     }
 
     return false;
-  };
+  }, []);
 
   useEffect(() => {
     refreshInstructorsFromBackend();
-  }, []);
+  }, [refreshInstructorsFromBackend]);
 
   const filteredInstructors = instructors.filter((instructor) => {
     const query = searchTerm.trim().toLowerCase();
@@ -293,11 +276,37 @@ export default function CreateInstructor({ initialModalOpen = false }) {
       instructor.department.toLowerCase().includes(query)
     );
   });
+  const totalPages = Math.max(1, Math.ceil(filteredInstructors.length / PAGE_SIZE));
+  const currentPageIndex = Math.min(currentPage, totalPages) - 1;
+  const pageStart = currentPageIndex * PAGE_SIZE;
+  const pageEnd = pageStart + PAGE_SIZE;
+  const paginatedInstructors = filteredInstructors.slice(pageStart, pageEnd);
+  const showingStart = filteredInstructors.length === 0 ? 0 : pageStart + 1;
+  const showingEnd = Math.min(pageEnd, filteredInstructors.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const openInstructorProfile = (instructor) => {
+    const profileId =
+      instructor.backendInstructorId ||
+      instructor.instructor_id ||
+      instructor.instructorId ||
+      instructor.universityId ||
+      instructor.id;
+
     setSelectedFacultyId(instructor.id);
-    navigate(`/admin/faculty/profile/${encodeRecordId(instructor.id)}`, {
-      state: { facultyId: instructor.id },
+    navigate(`/admin/faculty/profile/${encodeRecordId(profileId)}`, {
+      state: {
+        facultyId: instructor.id,
+        facultyMember: instructor,
+        instructorId: instructor.backendInstructorId || instructor.instructor_id || instructor.instructorId,
+      },
     });
   };
 
@@ -307,7 +316,8 @@ export default function CreateInstructor({ initialModalOpen = false }) {
 
     try {
       const backendInstructor = await createInstructorAccount(formValues);
-      const instructor = saveFacultyRecord(mapBackendInstructor(backendInstructor, formValues));
+      const mappedInstructor = mapBackendInstructor(backendInstructor, formValues);
+      const instructor = saveFacultyRecord(mappedInstructor);
       const didRefresh = await refreshInstructorsFromBackend();
 
       if (!didRefresh) {
@@ -315,8 +325,12 @@ export default function CreateInstructor({ initialModalOpen = false }) {
       }
 
       setOpen(false);
-      navigate(`/admin/instructor-created/${encodeRecordId(instructor.id)}`, {
-        state: { facultyId: instructor.id },
+      navigate(`/admin/instructor-created/${encodeRecordId(mappedInstructor.backendInstructorId || instructor.id)}`, {
+        state: {
+          facultyId: instructor.id,
+          facultyMember: mappedInstructor,
+          instructorId: mappedInstructor.backendInstructorId || mappedInstructor.instructor_id || mappedInstructor.instructorId,
+        },
       });
     } catch (error) {
       if (isMissingEndpointError(error)) {
@@ -345,7 +359,7 @@ export default function CreateInstructor({ initialModalOpen = false }) {
         <main className="create-instructor-main">
           <section className="instructor-page-header">
             <h1>Faculty Member</h1>
-            <p>Oversee academic staff, course loads, and departmental assignments.</p>
+            <p>Oversee academic staff and departmental assignments.</p>
           </section>
 
           {loadError && (
@@ -371,14 +385,11 @@ export default function CreateInstructor({ initialModalOpen = false }) {
                   <th>FACULTY MEMBER ID</th>
                   <th>TITLE / ROLE</th>
                   <th>DEPARTMENT</th>
-                  <th>COURSES LOAD</th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredInstructors.map((instructor) => {
-                  const full = instructor.progress === 100;
-                  return (
+                {paginatedInstructors.map((instructor) => (
                     <tr
                       key={instructor.id}
                       onClick={() => openInstructorProfile(instructor)}
@@ -395,13 +406,6 @@ export default function CreateInstructor({ initialModalOpen = false }) {
                       </td>
                       <td><span className="instructor-dept-pill">{instructor.department}</span></td>
                       <td>
-                        <div className="instructor-load">
-                          <span>{instructor.courseLoad || instructor.load}</span>
-                          {full && <b>FULL</b>}
-                          <i><em className={full ? "is-full" : ""} style={{ width: `${instructor.progress}%` }} /></i>
-                        </div>
-                      </td>
-                      <td>
                         <button
                           type="button"
                           className="instructor-view-profile"
@@ -414,12 +418,27 @@ export default function CreateInstructor({ initialModalOpen = false }) {
                         </button>
                       </td>
                     </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </table>
             <footer>
-              <div><button type="button">&lt;</button><span>Showing {filteredInstructors.length} of<br />{instructors.length}</span><button type="button">&gt;</button></div>
+              <div>
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                >
+                  &lt;
+                </button>
+                <span>Showing {showingStart}-{showingEnd} of<br />{filteredInstructors.length} faculty members</span>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                >
+                  &gt;
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {

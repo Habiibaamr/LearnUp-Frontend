@@ -9,6 +9,7 @@ import {
   saveStudentRecord,
   setSelectedStudentId,
 } from "../../../utils/learnupRecords.js";
+import { DEPARTMENT_FILTER_OPTIONS } from "../../../utils/departments.js";
 
 const Icon = ({ children, size = 22 }) => (
   <svg
@@ -150,7 +151,7 @@ const students = [
     email: "elena.rodriguez@learnup.edu",
     id: "STU-2024-001",
     level: "Level 2",
-    department: "Artificial Intelligence",
+    department: "AI",
     date: "Aug 28, 2026",
     term: "Fall Semester 2026",
     status: "ACTIVE",
@@ -161,7 +162,7 @@ const students = [
     email: "julian.vance@learnup.edu",
     id: "STU-2024-014",
     level: "Level 3",
-    department: "Information Systems",
+    department: "Information System",
     date: "Aug 29, 2026",
     term: "Fall Semester 2026",
     status: "ACTIVE",
@@ -183,7 +184,7 @@ const students = [
     email: "marcus.chen@learnup.edu",
     id: "STU-2024-058",
     level: "Level 4",
-    department: "Computer Science",
+    department: "CS",
     date: "Sep 04, 2026",
     term: "Fall Semester 2026",
     status: "ACTIVE",
@@ -192,7 +193,7 @@ const students = [
 ];
 
 const levels = ["All Levels", "Level 1", "Level 2", "Level 3", "Level 4"];
-const departments = ["All Departments", "Computer Science", "Artificial Intelligence", "Information Systems", "Cyber Security"];
+const departments = DEPARTMENT_FILTER_OPTIONS;
 
 function StudentProfileModal({ student, onClose }) {
   if (!student) return null;

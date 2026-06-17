@@ -47,7 +47,7 @@ function RegisterPage() {
         email,
         initialPassword: password,
         studentId: generateStudentId(),
-        department: "Computer Science",
+        department: "CS",
         level: "Level 1",
         enrollmentStatus: "Enrolled",
       },

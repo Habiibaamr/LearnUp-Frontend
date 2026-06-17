@@ -1,6 +1,7 @@
 import { CheckCircle2, Lock, MoreHorizontal } from "lucide-react";
 import StudentSidebar from "../../../components/student/StudentSidebar.jsx";
 import StudentTopbar from "../../../components/student/StudentTopbar.jsx";
+import { filterRealisticStudentCourses } from "../../../utils/courseVisibility.js";
 import "./academicMap.css";
 
 // Mock roadmap levels stay in place until an academic-map/degree-audit endpoint is confirmed.
@@ -49,6 +50,13 @@ const levels = [
   },
 ];
 
+const roadmapLevels = levels
+  .map((level) => ({
+    ...level,
+    courses: filterRealisticStudentCourses(level.courses),
+  }))
+  .filter((level) => level.courses.length > 0);
+
 function StatusIcon({ status }) {
   if (status === "passed") return <CheckCircle2 size={17} />;
   if (status === "enrolled") return <MoreHorizontal size={17} />;
@@ -89,7 +97,7 @@ export default function AcademicMap() {
           </section>
 
           <section className="academic-roadmap" aria-label="Academic roadmap">
-            {levels.map((level, levelIndex) => (
+            {roadmapLevels.map((level, levelIndex) => (
               <div className="academic-roadmap-column" key={level.level}>
                 <header>
                   <span className={`academic-roadmap-column__dot is-${level.tone}`}>{levelIndex + 1}</span>
@@ -100,7 +108,7 @@ export default function AcademicMap() {
                     <RoadmapCard
                       key={`${level.level}-${course.code}-${course.title}-${index}`}
                       course={course}
-                      showArrow={levelIndex < levels.length - 1 && index < levels[levelIndex + 1].courses.length}
+                      showArrow={levelIndex < roadmapLevels.length - 1 && index < roadmapLevels[levelIndex + 1].courses.length}
                     />
                   ))}
                 </div>

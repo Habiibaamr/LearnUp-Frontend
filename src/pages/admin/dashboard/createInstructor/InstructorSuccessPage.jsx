@@ -14,6 +14,7 @@ export default function InstructorSuccessPage() {
   const { facultyId } = useParams();
   const { state } = useLocation();
   const faculty =
+    state?.facultyMember ||
     findFacultyById(facultyId) ||
     findFacultyById(state?.facultyId) ||
     getLastCreatedFaculty();
@@ -24,9 +25,20 @@ export default function InstructorSuccessPage() {
       return;
     }
 
+    const profileId =
+      faculty.backendInstructorId ||
+      faculty.instructor_id ||
+      faculty.instructorId ||
+      faculty.universityId ||
+      faculty.id;
+
     setSelectedFacultyId(faculty.id);
-    navigate(`/admin/faculty/profile/${encodeRecordId(faculty.id)}`, {
-      state: { facultyId: faculty.id },
+    navigate(`/admin/faculty/profile/${encodeRecordId(profileId)}`, {
+      state: {
+        facultyId: faculty.id,
+        facultyMember: faculty,
+        instructorId: faculty.backendInstructorId || faculty.instructor_id || faculty.instructorId,
+      },
     });
   };
 

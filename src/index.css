@@ -25,3 +25,113 @@ select,
 textarea {
   font: inherit;
 }
+
+.student-table-card table,
+.instructor-table-card table,
+.assign-table-card table {
+  font-size: 13px !important;
+}
+
+.student-table-card th,
+.instructor-table-card th,
+.assign-table-card th {
+  height: 44px !important;
+  color: #667085 !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: .12em !important;
+  text-transform: uppercase !important;
+}
+
+.student-table-card td,
+.instructor-table-card td,
+.assign-table-card td {
+  height: 62px !important;
+  color: #334155 !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+}
+
+.student-table-card strong,
+.instructor-table-card strong,
+.assign-table-card strong {
+  color: #111827 !important;
+  font-size: 13px !important;
+  font-weight: 850 !important;
+}
+
+.student-table-card small,
+.instructor-table-card small,
+.assign-table-card small {
+  color: #94a3b8 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+
+.student-table-card td:nth-child(2),
+.instructor-table-card td:nth-child(2),
+.assign-table-card td:nth-child(2) {
+  font-size: 12px !important;
+  font-weight: 750 !important;
+}
+
+.student-level-pill,
+.instructor-dept-pill,
+.assign-course-pills span {
+  font-size: 10px !important;
+  font-weight: 850 !important;
+}
+
+.student-filters div label,
+.student-filter-select select,
+.instructor-search {
+  height: 42px !important;
+}
+
+.student-filters input,
+.student-filters select,
+.instructor-search input {
+  font-size: 13px !important;
+}
+
+.student-table-card footer,
+.instructor-table-card footer,
+.assign-pagination {
+  min-height: 56px !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+}
+
+.student-table-card footer div,
+.instructor-table-card footer div,
+.assign-pagination div {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.student-table-card footer button,
+.instructor-table-card footer div button,
+.assign-pagination button {
+  width: 28px !important;
+  height: 28px !important;
+  border: 1px solid #e2e7f0 !important;
+  border-radius: 7px !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.student-table-card footer button.active,
+.assign-pagination button.active {
+  color: #075bff !important;
+}
+
+.student-table-card footer button:disabled,
+.instructor-table-card footer div button:disabled,
+.assign-pagination button:disabled {
+  cursor: not-allowed !important;
+  opacity: .45 !important;
+}
