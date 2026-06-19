@@ -334,6 +334,30 @@
   color: #dc2626;
 }
 
+.faculty-enroll-status--not-eligible {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.faculty-enroll-status-reason {
+  display: block;
+  max-width: 220px;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.faculty-enroll-table-card td.faculty-enroll-table-empty {
+  display: table-cell;
+  height: 96px;
+  color: #64748b;
+  font-weight: 800;
+  text-align: center;
+}
+
 .faculty-enroll-table-card input[type="checkbox"] {
   width: 18px;
   height: 18px;
@@ -431,6 +455,45 @@
 
 .faculty-enroll-selection button {
   width: 100%;
+}
+
+.faculty-enroll-faculty-name {
+  display: block;
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.faculty-enroll-message {
+  margin: 20px 0 0;
+  padding: 13px 16px;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.faculty-enroll-message--error,
+.faculty-enroll-capacity-warning {
+  color: #b91c1c;
+}
+
+.faculty-enroll-message--error {
+  border-color: #fecaca;
+}
+
+.faculty-enroll-message--success {
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.faculty-enroll-capacity-warning {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 850;
 }
 
 .faculty-enroll-page--success {

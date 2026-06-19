@@ -11,6 +11,12 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { mapBackendInstructor } from "../../../services/adminAccounts.js";
 import { apiClient } from "../../../services/apiClient.js";
 import {
+  fetchFacultyCourses,
+  fetchFacultyProfile,
+  isFacultyAuthError,
+} from "../../../services/facultyPortal.js";
+import {
+  clearCurrentSession,
   findFacultyById,
   getCurrentSession,
   getSelectedFaculty,
@@ -488,6 +494,31 @@ export default function FacultyProfile() {
         setBackendError("");
         setProfileNotFound(false);
 
+        if (session?.role === "faculty") {
+          const [profile, courses] = await Promise.all([
+            fetchFacultyProfile(),
+            fetchFacultyCourses(),
+          ]);
+          const mappedProfile = mapBackendInstructor(
+            profile,
+            stateFaculty || localFaculty || {},
+          );
+          const profileCourses = courses.map((course) => ({
+            ...course,
+            students: course.enrolled_students_count,
+            semester: course.semester_name,
+          }));
+
+          console.log("FACULTY PROFILE", profile);
+          console.log("FACULTY ASSIGNED COURSES", courses);
+
+          if (isMounted) {
+            setBackendFaculty(applyProfileAssignments(mappedProfile, profileCourses));
+            setBackendLoaded(true);
+          }
+          return;
+        }
+
         const profileId = getProfileIdForLookup(profileUrlId, stateFaculty, localFaculty);
         const response = await apiClient.get("/admin/instructors");
         const instructors = getArrayPayload(response, ["instructors", "faculty", "items", "results", "data"]);
@@ -536,6 +567,12 @@ export default function FacultyProfile() {
           setBackendLoaded(true);
         }
       } catch (error) {
+        if (session?.role === "faculty" && isFacultyAuthError(error)) {
+          clearCurrentSession();
+          navigate("/login", { replace: true });
+          return;
+        }
+
         console.info(
           `[LearnUp] Faculty profile backend lookup skipped (${error?.status || 0}: ${
             error?.message || "Unknown error"
@@ -560,7 +597,7 @@ export default function FacultyProfile() {
     return () => {
       isMounted = false;
     };
-  }, [profileUrlId, stateFaculty, localFaculty]);
+  }, [localFaculty, navigate, profileUrlId, session?.role, stateFaculty]);
 
   useEffect(() => {
     if (selectedFacultyId) {

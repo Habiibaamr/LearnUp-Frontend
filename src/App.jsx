@@ -24,13 +24,65 @@ import FacultyCourseBoard from "./pages/faculty/courseBoard/FacultyCourseBoard.j
 import CourseStudents from "./pages/faculty/courseStudents/CourseStudents.jsx";
 import EnrollStudent from "./pages/faculty/enrollStudent/EnrollStudent.jsx";
 import EnrollmentSuccess from "./pages/faculty/enrollStudent/EnrollmentSuccess.jsx";
-import { getCurrentSession, getDashboardPathForRole } from "./utils/learnupRecords.js";
+import {
+  clearCurrentSession,
+  getCurrentSession,
+  getDashboardPathForRole,
+  setCurrentSession,
+} from "./utils/learnupRecords.js";
+
+const BACKEND_ROLE_TO_APP_ROLE = {
+  student: "student",
+  instructor: "faculty",
+  faculty: "faculty",
+  admin: "admin",
+  super_admin: "admin",
+};
+
+function getFacultyTokenState() {
+  try {
+    const token = localStorage.getItem("learnup_access_token") || "";
+    if (!token) {
+      return { token: "", appRole: null, expired: false };
+    }
+
+    const encodedPayload = token.split(".")[1];
+    if (!encodedPayload) {
+      return { token, appRole: null, expired: false };
+    }
+
+    const base64 = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const payload = JSON.parse(window.atob(padded));
+    const appRole = BACKEND_ROLE_TO_APP_ROLE[String(payload.role || "").toLowerCase()] || null;
+    const expired = Number(payload.exp) > 0 && Number(payload.exp) * 1000 <= Date.now();
+
+    return { token, appRole, expired };
+  } catch {
+    return { token: "", appRole: null, expired: true };
+  }
+}
 
 function RequireRole({ role, children }) {
   const session = getCurrentSession();
 
   if (!session?.role) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (role === "faculty") {
+    const tokenState = getFacultyTokenState();
+
+    if (!tokenState.token || tokenState.expired) {
+      clearCurrentSession();
+      return <Navigate to="/login" replace />;
+    }
+
+    if (tokenState.appRole && tokenState.appRole !== "faculty") {
+      const { role: _ignoredRole, ...sessionPayload } = session;
+      setCurrentSession(tokenState.appRole, sessionPayload);
+      return <Navigate to={getDashboardPathForRole(tokenState.appRole)} replace />;
+    }
   }
 
   if (session.role !== role) {
@@ -120,8 +172,22 @@ export function LearnUpRoutes() {
         <Route path="/faculty/dashboard" element={requireRole("faculty", <FacultyDashboard />)} />
         <Route path="/faculty/students" element={requireRole("faculty", <FacultyStudents />)} />
         <Route path="/faculty/course-board" element={requireRole("faculty", <FacultyCourseBoard />)} />
-        <Route path="/faculty/courses/:courseCode/students" element={requireRole("faculty", <CourseStudents />)} />
-        <Route path="/faculty/courses/:courseCode/enroll" element={requireRole("faculty", <EnrollStudent />)} />
+        <Route
+          path="/faculty/course-offerings/:courseOfferingId/students"
+          element={requireRole("faculty", <CourseStudents />)}
+        />
+        <Route
+          path="/faculty/courses/:courseCode/students"
+          element={requireRole("faculty", <Navigate to="/faculty/course-board" replace />)}
+        />
+        <Route
+          path="/faculty/course-offerings/:courseOfferingId/enroll"
+          element={requireRole("faculty", <EnrollStudent />)}
+        />
+        <Route
+          path="/faculty/courses/:courseCode/enroll"
+          element={requireRole("faculty", <Navigate to="/faculty/course-board" replace />)}
+        />
         <Route
           path="/faculty/courses/:courseCode/enroll/success"
           element={requireRole("faculty", <EnrollmentSuccess />)}

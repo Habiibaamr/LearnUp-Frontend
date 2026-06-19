@@ -89,6 +89,22 @@
   color: #16a34a;
 }
 
+.faculty-course-load-meter {
+  width: 100%;
+  height: 6px;
+  margin-top: 16px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.faculty-course-load-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2024c7;
+}
+
 .faculty-risk-meter {
   width: 142px;
   height: 6px;
@@ -281,6 +297,11 @@
   color: #b45309 !important;
 }
 
+.faculty-status--active {
+  background: #dbeafe;
+  color: #1d4ed8 !important;
+}
+
 .faculty-snapshot button {
   width: 112px;
   height: 36px;
@@ -295,6 +316,25 @@
 
 .faculty-snapshot button:hover {
   background: #111fc7;
+}
+
+.faculty-snapshot td.faculty-table-empty {
+  display: table-cell;
+  height: 96px;
+  color: #64748b;
+  font-weight: 800;
+  text-align: center;
+}
+
+.faculty-dashboard__message {
+  margin: 24px 0 0;
+  padding: 14px 18px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .faculty-profile-overlay {

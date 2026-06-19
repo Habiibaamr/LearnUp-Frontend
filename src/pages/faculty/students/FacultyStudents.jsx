@@ -1,12 +1,14 @@
 import { ArrowLeft, Search, SlidersHorizontal, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import FacultyLayout from "../../../components/faculty/FacultyLayout.jsx";
 import {
-  facultyStudents,
-  getFacultyStatusClass,
-} from "../../../data/facultyStudents.js";
+  fetchFacultyProfile,
+  fetchFacultyStudents,
+  isFacultyAuthError,
+} from "../../../services/facultyPortal.js";
 import {
+  clearCurrentSession,
   encodeRecordId,
   setSelectedStudentId,
 } from "../../../utils/learnupRecords.js";
@@ -16,44 +18,102 @@ function StudentAvatar({ type }) {
   return <span className={`faculty-students-avatar faculty-students-avatar--${type}`} />;
 }
 
+const getStatusClass = (status) => status.toLowerCase().replace(/\s+/g, "-");
+
 export default function FacultyStudents() {
   const navigate = useNavigate();
+  const [facultyProfile, setFacultyProfile] = useState(null);
+  const [facultyStudents, setFacultyStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [query, setQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [gpaFilter, setGpaFilter] = useState("all");
-  const atRiskStudents = facultyStudents.filter((student) => student.status === "AT RISK").length;
-  const averageGpa = (
-    facultyStudents.reduce((total, student) => total + Number(student.gpa), 0) /
-    facultyStudents.length
-  ).toFixed(2);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadStudents() {
+      try {
+        setLoading(true);
+        setErrorMessage("");
+        const [profile, students] = await Promise.all([
+          fetchFacultyProfile(),
+          fetchFacultyStudents(),
+        ]);
+
+        console.log("FACULTY PROFILE", profile);
+        console.log("FACULTY STUDENTS", students);
+
+        if (isMounted) {
+          setFacultyProfile(profile);
+          setFacultyStudents(students);
+        }
+      } catch (error) {
+        if (isFacultyAuthError(error)) {
+          clearCurrentSession();
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        if (isMounted) {
+          setErrorMessage(error?.message || "Faculty students could not be loaded.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadStudents();
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
+
+  const atRiskStudents = facultyStudents.filter(
+    (student) => student.academic_status === "AT RISK",
+  ).length;
+  const studentsWithGpa = facultyStudents.filter((student) => student.cgpa !== null);
+  const averageGpa = studentsWithGpa.length
+    ? (
+      studentsWithGpa.reduce((total, student) => total + student.cgpa, 0) /
+      studentsWithGpa.length
+    ).toFixed(2)
+    : "—";
 
   const filteredStudents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
     return facultyStudents.filter((student) => {
-      const gpa = Number(student.gpa);
       const matchesQuery =
         !normalizedQuery ||
-        student.name.toLowerCase().includes(normalizedQuery) ||
+        student.full_name.toLowerCase().includes(normalizedQuery) ||
         student.email.toLowerCase().includes(normalizedQuery) ||
-        student.id.toLowerCase().includes(normalizedQuery);
-      const matchesLevel = levelFilter === "all" || student.level === levelFilter;
-      const matchesStatus = statusFilter === "all" || student.status === statusFilter;
+        student.university_id.toLowerCase().includes(normalizedQuery);
+      const matchesLevel =
+        levelFilter === "all" ||
+        String(student.level || "") === levelFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        student.academic_status === statusFilter;
       const matchesGpa =
         gpaFilter === "all" ||
-        (gpaFilter === "high" && gpa >= 3.5) ||
-        (gpaFilter === "mid" && gpa >= 2.5 && gpa < 3.5) ||
-        (gpaFilter === "risk" && gpa < 2.5);
+        (student.cgpa !== null && gpaFilter === "high" && student.cgpa >= 3.5) ||
+        (student.cgpa !== null && gpaFilter === "mid" && student.cgpa >= 2.5 && student.cgpa < 3.5) ||
+        (student.cgpa !== null && gpaFilter === "risk" && student.cgpa < 2.5);
 
       return matchesQuery && matchesLevel && matchesStatus && matchesGpa;
     });
-  }, [gpaFilter, levelFilter, query, statusFilter]);
+  }, [facultyStudents, gpaFilter, levelFilter, query, statusFilter]);
 
   const openStudentProfile = (student) => {
-    setSelectedStudentId(student.id);
-    navigate(`/faculty/student/profile/${encodeRecordId(student.id)}`, {
-      state: { studentId: student.id },
+    const studentId = student.university_id || student.student_id;
+    setSelectedStudentId(studentId);
+    navigate(`/faculty/student/profile/${encodeRecordId(studentId)}`, {
+      state: { studentId },
     });
   };
 
@@ -67,25 +127,31 @@ export default function FacultyStudents() {
               <span>Dashboard</span>
             </Link>
             <h1>All Students</h1>
-            <p>Complete academic roster for Dr. Amira Ahmed&apos;s assigned students.</p>
+            <p>
+              Related students for {facultyProfile?.full_name || "the logged-in faculty member"}.
+            </p>
           </div>
           <div className="faculty-students-page__icon" aria-hidden="true">
             <Users size={24} strokeWidth={2.5} />
           </div>
         </header>
 
+        {errorMessage && (
+          <p className="faculty-students-page__message" role="alert">{errorMessage}</p>
+        )}
+
         <section className="faculty-students-summary" aria-label="Students summary">
           <article>
             <span>Total Students</span>
-            <strong>{facultyStudents.length}</strong>
+            <strong>{loading ? "—" : facultyStudents.length}</strong>
           </article>
           <article>
             <span>Average GPA</span>
-            <strong>{averageGpa}</strong>
+            <strong>{loading ? "—" : averageGpa}</strong>
           </article>
           <article>
             <span>At Risk</span>
-            <strong>{atRiskStudents}</strong>
+            <strong>{loading ? "—" : atRiskStudents}</strong>
           </article>
         </section>
 
@@ -113,10 +179,10 @@ export default function FacultyStudents() {
               </span>
               <select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)} aria-label="Filter by level">
                 <option value="all">All Levels</option>
-                <option value="LVL 1.00">Level 1</option>
-                <option value="LVL 2.00">Level 2</option>
-                <option value="LVL 3.00">Level 3</option>
-                <option value="LVL 4.00">Level 4</option>
+                <option value="1">Level 1</option>
+                <option value="2">Level 2</option>
+                <option value="3">Level 3</option>
+                <option value="4">Level 4</option>
               </select>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by status">
                 <option value="all">All Statuses</option>
@@ -141,35 +207,45 @@ export default function FacultyStudents() {
                   <th>LEVEL</th>
                   <th>DEPARTMENT</th>
                   <th>GPA</th>
-                  <th>STATUS</th>
-                  <th>COURSES</th>
-                  <th>ATTENDANCE</th>
+                  <th>ACADEMIC STATUS</th>
+                  <th>RELATIONSHIP</th>
+                  <th>ACCOUNT</th>
                   <th>ACTION</th>
                 </tr>
               </thead>
               <tbody>
+                {!loading && filteredStudents.length === 0 && (
+                  <tr>
+                    <td className="faculty-students-table-empty" colSpan="9">
+                      {facultyStudents.length === 0
+                        ? "No students assigned yet."
+                        : "No students match the selected filters."}
+                    </td>
+                  </tr>
+                )}
                 {filteredStudents.map((student) => (
-                  <tr key={student.id} onClick={() => openStudentProfile(student)}>
+                  <tr
+                    key={student.university_id || student.student_id}
+                    onClick={() => openStudentProfile(student)}
+                  >
                     <td>
                       <StudentAvatar type={student.avatar} />
                       <div>
-                        <strong>{student.name}</strong>
-                        <span>{student.email}</span>
+                        <strong>{student.full_name}</strong>
+                        <span>{student.email || "Email not available"}</span>
                       </div>
                     </td>
-                    <td>{student.id}</td>
-                    <td>{student.level}</td>
-                    <td>{student.department}</td>
+                    <td>{student.university_id || "—"}</td>
+                    <td>{student.level_label}</td>
+                    <td>{student.department_name}</td>
+                    <td><b>{student.gpa_label}</b></td>
                     <td>
-                      <b>{student.gpa}</b>
-                    </td>
-                    <td>
-                      <span className={`faculty-students-status faculty-students-status--${getFacultyStatusClass(student.status)}`}>
-                        {student.status}
+                      <span className={`faculty-students-status faculty-students-status--${getStatusClass(student.academic_status)}`}>
+                        {student.academic_status}
                       </span>
                     </td>
-                    <td>{student.courseLoad}</td>
-                    <td>{student.attendance}</td>
+                    <td>{student.relationship_label}</td>
+                    <td>{student.status}</td>
                     <td>
                       <button
                         type="button"

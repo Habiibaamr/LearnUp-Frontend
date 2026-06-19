@@ -106,12 +106,13 @@ function LoginPage() {
       }
 
       try {
-        const meResponse = await apiClient.get("/auth/me");
+        const mePath = appRole === "faculty" ? "/faculty/me" : "/auth/me";
+        const meResponse = await apiClient.get(mePath);
         if (meResponse) {
           localStorage.setItem("learnup_current_user", JSON.stringify(meResponse));
         }
       } catch {
-        // Fall back to the login payload if /auth/me is unavailable.
+        // Fall back to the login payload if the role-specific profile is unavailable.
       }
 
       setCurrentSession(appRole, {

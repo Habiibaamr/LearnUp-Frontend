@@ -1,14 +1,13 @@
-import { ArrowLeft, Search, UserPlus, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowLeft, Search, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import FacultyLayout from "../../../components/faculty/FacultyLayout.jsx";
 import {
-  decodeCourseCode,
-  getFacultyCourseByCode,
-  getFacultyCourseStudents,
-} from "../../../data/facultyCourses.js";
-import { getFacultyStatusClass } from "../../../data/facultyStudents.js";
+  fetchFacultyCourseStudents,
+  isFacultyAuthError,
+} from "../../../services/facultyPortal.js";
 import {
+  clearCurrentSession,
   encodeRecordId,
   setSelectedStudentId,
 } from "../../../utils/learnupRecords.js";
@@ -18,13 +17,53 @@ function CourseStudentAvatar({ type }) {
   return <span className={`faculty-course-students-avatar faculty-course-students-avatar--${type}`} />;
 }
 
+const getStatusClass = (status) => status.toLowerCase().replace(/\s+/g, "-");
+
 export default function CourseStudents() {
-  const { courseCode } = useParams();
+  const { courseOfferingId } = useParams();
   const navigate = useNavigate();
+  const [course, setCourse] = useState(null);
+  const [enrolledStudents, setEnrolledStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [query, setQuery] = useState("");
-  const course = getFacultyCourseByCode(courseCode);
-  const decodedCode = course?.code || decodeCourseCode(courseCode);
-  const enrolledStudents = useMemo(() => getFacultyCourseStudents(decodedCode), [decodedCode]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCourseStudents() {
+      try {
+        setLoading(true);
+        setErrorMessage("");
+        const response = await fetchFacultyCourseStudents(courseOfferingId);
+
+        if (isMounted) {
+          setCourse(response.course);
+          setEnrolledStudents(response.students);
+        }
+      } catch (error) {
+        if (isFacultyAuthError(error)) {
+          clearCurrentSession();
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        if (isMounted) {
+          setErrorMessage(error?.message || "Course students could not be loaded.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadCourseStudents();
+    return () => {
+      isMounted = false;
+    };
+  }, [courseOfferingId, navigate]);
+
   const filteredStudents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -33,22 +72,24 @@ export default function CourseStudents() {
     }
 
     return enrolledStudents.filter((student) => (
-      student.name.toLowerCase().includes(normalizedQuery) ||
+      student.full_name.toLowerCase().includes(normalizedQuery) ||
       student.email.toLowerCase().includes(normalizedQuery) ||
-      student.id.toLowerCase().includes(normalizedQuery)
+      student.university_id.toLowerCase().includes(normalizedQuery)
     ));
   }, [enrolledStudents, query]);
-  const averageGpa = enrolledStudents.length
+  const studentsWithGpa = enrolledStudents.filter((student) => student.cgpa !== null);
+  const averageGpa = studentsWithGpa.length
     ? (
-      enrolledStudents.reduce((total, student) => total + Number(student.gpa), 0) /
-      enrolledStudents.length
+      studentsWithGpa.reduce((total, student) => total + student.cgpa, 0) /
+      studentsWithGpa.length
     ).toFixed(2)
-    : "0.00";
+    : "—";
 
   const openStudentProfile = (student) => {
-    setSelectedStudentId(student.id);
-    navigate(`/faculty/student/profile/${encodeRecordId(student.id)}`, {
-      state: { studentId: student.id },
+    const studentId = student.university_id || student.student_id;
+    setSelectedStudentId(studentId);
+    navigate(`/faculty/student/profile/${encodeRecordId(studentId)}`, {
+      state: { studentId },
     });
   };
 
@@ -61,34 +102,43 @@ export default function CourseStudents() {
               <ArrowLeft size={15} strokeWidth={2.6} />
               <span>Course Board</span>
             </Link>
-            <h1>Students Enrolled in {decodedCode}</h1>
-            <p>{course?.title || "Selected course"} student roster and academic status.</p>
+            <h1>Students Enrolled in {course?.course_code || "Assigned Course"}</h1>
+            <p>{course?.course_title || "Assigned course"} student roster and academic status.</p>
           </div>
-          <Link to={`/faculty/courses/${encodeURIComponent(decodedCode)}/enroll`} className="faculty-course-students-enroll">
-            <UserPlus size={17} strokeWidth={2.5} />
-            <span>Enroll New Student</span>
-          </Link>
+          {course && (
+            <Link
+              to={`/faculty/course-offerings/${course.course_offering_id}/enroll`}
+              className="faculty-course-students-enroll"
+            >
+              <UserPlus size={17} strokeWidth={2.5} />
+              <span>Enroll New Student</span>
+            </Link>
+          )}
         </header>
+
+        {errorMessage && (
+          <p className="faculty-course-students-message" role="alert">{errorMessage}</p>
+        )}
 
         <section className="faculty-course-students-summary" aria-label="Course student summary">
           <article>
             <span>Enrolled Students</span>
-            <strong>{enrolledStudents.length}</strong>
+            <strong>{loading ? "—" : enrolledStudents.length}</strong>
           </article>
           <article>
             <span>Average GPA</span>
-            <strong>{averageGpa}</strong>
+            <strong>{loading ? "—" : averageGpa}</strong>
           </article>
           <article>
             <span>Course Capacity</span>
-            <strong>{course?.students || enrolledStudents.length}</strong>
+            <strong>{loading ? "—" : (course?.capacity || "Not available")}</strong>
           </article>
         </section>
 
         <section className="faculty-course-students-table-card">
           <header>
             <div>
-              <h2>{course?.title || decodedCode}</h2>
+              <h2>{course?.course_title || "Assigned course"}</h2>
               <span>{filteredStudents.length} of {enrolledStudents.length} roster records</span>
             </div>
             <label>
@@ -109,29 +159,41 @@ export default function CourseStudents() {
                   <th>STUDENT NAME</th>
                   <th>ID</th>
                   <th>LEVEL</th>
+                  <th>DEPARTMENT</th>
                   <th>GPA</th>
-                  <th>ATTENDANCE</th>
                   <th>STATUS</th>
                   <th>ACTION</th>
                 </tr>
               </thead>
               <tbody>
+                {!loading && filteredStudents.length === 0 && (
+                  <tr>
+                    <td className="faculty-course-students-empty" colSpan="7">
+                      {course
+                        ? "No students are enrolled in this assigned course."
+                        : "This course is not assigned to the logged-in faculty member."}
+                    </td>
+                  </tr>
+                )}
                 {filteredStudents.map((student) => (
-                  <tr key={student.id} onClick={() => openStudentProfile(student)}>
+                  <tr
+                    key={student.university_id || student.student_id}
+                    onClick={() => openStudentProfile(student)}
+                  >
                     <td>
                       <CourseStudentAvatar type={student.avatar} />
                       <div>
-                        <strong>{student.name}</strong>
-                        <span>{student.email}</span>
+                        <strong>{student.full_name}</strong>
+                        <span>{student.email || "Email not available"}</span>
                       </div>
                     </td>
-                    <td>{student.id}</td>
-                    <td>{student.level}</td>
-                    <td><b>{student.gpa}</b></td>
-                    <td>{student.attendance}</td>
+                    <td>{student.university_id || "—"}</td>
+                    <td>{student.level_label}</td>
+                    <td>{student.department_name}</td>
+                    <td><b>{student.gpa_label}</b></td>
                     <td>
-                      <span className={`faculty-course-students-status faculty-course-students-status--${getFacultyStatusClass(student.status)}`}>
-                        {student.status}
+                      <span className={`faculty-course-students-status faculty-course-students-status--${getStatusClass(student.academic_status)}`}>
+                        {student.academic_status}
                       </span>
                     </td>
                     <td>

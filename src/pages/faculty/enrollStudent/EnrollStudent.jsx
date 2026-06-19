@@ -6,125 +6,188 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import FacultyLayout from "../../../components/faculty/FacultyLayout.jsx";
 import {
-  decodeCourseCode,
-  getFacultyCourseByCode,
-} from "../../../data/facultyCourses.js";
+  enrollFacultyStudents,
+  fetchFacultyCourseEnrollment,
+  fetchFacultyProfile,
+  isFacultyAuthError,
+} from "../../../services/facultyPortal.js";
+import { clearCurrentSession } from "../../../utils/learnupRecords.js";
 import "./enrollStudent.css";
 
-const enrollmentCandidates = [
-  {
-    name: "Marcus Thorne",
-    id: "STD-2023-142",
-    department: "Computer Science",
-    level: "Level 4",
-    gpa: "3.92",
-    status: "Eligible",
-  },
-  {
-    name: "Leila Chen",
-    id: "STD-2023-055",
-    department: "Artificial Intelligence",
-    level: "Level 3",
-    gpa: "3.95",
-    status: "Already Enrolled",
-  },
-  {
-    name: "Alex Smith",
-    id: "STD-2023-089",
-    department: "Information System",
-    level: "Level 2",
-    gpa: "2.15",
-    status: "At Risk",
-  },
-  {
-    name: "Elena Rodriguez",
-    id: "STD-2023-211",
-    department: "Cyber Security",
-    level: "Level 4",
-    gpa: "3.45",
-    status: "Eligible",
-  },
-];
-
-const currentSeats = 28;
-const courseCapacity = 40;
-
 function getStatusClass(status) {
-  return status.toLowerCase().replace(/\s+/g, "-");
+  return status.toLowerCase().replace(/_/g, "-");
 }
 
-function isSelectable(student) {
-  return student.status === "Eligible";
+function getInitials(name) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 export default function EnrollStudent() {
-  const { courseCode } = useParams();
+  const { courseOfferingId } = useParams();
   const navigate = useNavigate();
-  const course = getFacultyCourseByCode(courseCode);
-  const decodedCode = course?.code || decodeCourseCode(courseCode);
-  const courseTitle = course?.title || "Intro to Computing";
+  const [facultyProfile, setFacultyProfile] = useState(null);
+  const resolvedOfferingId = Number(courseOfferingId) || null;
+  const [courseOffering, setCourseOffering] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [query, setQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+
+  const loadEnrollmentPage = useCallback(async ({ keepSuccess = false } = {}) => {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+      if (!keepSuccess) {
+        setSuccessMessage("");
+      }
+
+      if (!resolvedOfferingId) {
+        throw new Error("A valid assigned course offering is required.");
+      }
+      const [profile, enrollmentData] = await Promise.all([
+        fetchFacultyProfile(),
+        fetchFacultyCourseEnrollment(resolvedOfferingId),
+      ]);
+
+      console.log("LOGGED FACULTY", profile);
+      console.log("SELECTED COURSE OFFERING", enrollmentData.course);
+      console.log("ENROLLMENT PAGE STUDENTS", enrollmentData.students);
+
+      setFacultyProfile(profile);
+      setCourseOffering(enrollmentData.course);
+      setStudents(enrollmentData.students);
+      setUsingFallback(enrollmentData.usingFallback);
+      setSelectedStudentIds([]);
+    } catch (error) {
+      if (isFacultyAuthError(error)) {
+        clearCurrentSession();
+        navigate("/login", { replace: true });
+        return;
+      }
+      setErrorMessage(error?.message || "Enrollment data could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate, resolvedOfferingId]);
+
+  useEffect(() => {
+    let isActive = true;
+    queueMicrotask(() => {
+      if (isActive) {
+        loadEnrollmentPage();
+      }
+    });
+    return () => {
+      isActive = false;
+    };
+  }, [loadEnrollmentPage]);
+
+  useEffect(() => {
+    console.log("SELECTED STUDENTS", selectedStudentIds);
+  }, [selectedStudentIds]);
 
   const departments = useMemo(
-    () => Array.from(new Set(enrollmentCandidates.map((student) => student.department))),
-    [],
+    () => Array.from(
+      new Set(students.map((student) => student.department_name).filter(Boolean)),
+    ).sort(),
+    [students],
   );
   const levels = useMemo(
-    () => Array.from(new Set(enrollmentCandidates.map((student) => student.level))),
-    [],
+    () => Array.from(
+      new Set(students.map((student) => student.level).filter(Boolean)),
+    ).sort((first, second) => first - second),
+    [students],
   );
 
   const filteredStudents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return enrollmentCandidates.filter((student) => {
+    return students.filter((student) => {
       const matchesQuery =
         !normalizedQuery ||
-        student.name.toLowerCase().includes(normalizedQuery) ||
-        student.id.toLowerCase().includes(normalizedQuery);
-      const matchesDepartment = departmentFilter === "all" || student.department === departmentFilter;
-      const matchesLevel = levelFilter === "all" || student.level === levelFilter;
+        student.full_name.toLowerCase().includes(normalizedQuery) ||
+        student.university_id.toLowerCase().includes(normalizedQuery);
+      const matchesDepartment =
+        departmentFilter === "all" ||
+        student.department_name === departmentFilter;
+      const matchesLevel =
+        levelFilter === "all" ||
+        String(student.level || "") === levelFilter;
 
       return matchesQuery && matchesDepartment && matchesLevel;
     });
-  }, [departmentFilter, levelFilter, query]);
+  }, [departmentFilter, levelFilter, query, students]);
 
-  const selectedStudents = enrollmentCandidates.filter((student) => selectedIds.includes(student.id));
+  const selectedStudents = students.filter((student) => (
+    selectedStudentIds.includes(student.student_id)
+  ));
+  const currentSeats = courseOffering?.current_enrolled_count || 0;
+  const courseCapacity = courseOffering?.capacity || 0;
+  const remainingSeats = courseOffering?.remaining_seats || 0;
   const afterEnrollmentSeats = currentSeats + selectedStudents.length;
+  const selectionExceedsCapacity = selectedStudents.length > remainingSeats;
+  const submitDisabled =
+    submitting ||
+    usingFallback ||
+    selectedStudents.length === 0 ||
+    selectionExceedsCapacity;
+  const courseCodeValue = courseOffering?.course_code || "";
 
   const toggleStudent = (student) => {
-    if (!isSelectable(student)) {
+    if (!student.is_selectable || student.is_fallback) {
       return;
     }
 
-    setSelectedIds((currentIds) => (
-      currentIds.includes(student.id)
-        ? currentIds.filter((id) => id !== student.id)
-        : [...currentIds, student.id]
+    setSelectedStudentIds((currentIds) => (
+      currentIds.includes(student.student_id)
+        ? currentIds.filter((id) => id !== student.student_id)
+        : [...currentIds, student.student_id]
     ));
   };
 
-  const submitEnrollment = () => {
-    if (selectedStudents.length === 0) {
+  const submitEnrollment = async () => {
+    if (submitDisabled || !resolvedOfferingId) {
       return;
     }
 
-    navigate(`/faculty/courses/${encodeURIComponent(decodedCode)}/enroll/success`, {
-      state: {
-        courseCode: decodedCode,
-        courseTitle,
-        enrolledStudents: selectedStudents,
-        currentSeats,
-        capacity: courseCapacity,
-      },
-    });
+    try {
+      setSubmitting(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+      const response = await enrollFacultyStudents(
+        resolvedOfferingId,
+        selectedStudentIds,
+      );
+
+      console.log("ENROLLMENT RESPONSE", response);
+      setSuccessMessage(response?.message || "Students enrolled successfully.");
+      await loadEnrollmentPage({ keepSuccess: true });
+    } catch (error) {
+      if (isFacultyAuthError(error)) {
+        clearCurrentSession();
+        navigate("/login", { replace: true });
+        return;
+      }
+      setErrorMessage(error?.message || "Students could not be enrolled.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -132,33 +195,60 @@ export default function EnrollStudent() {
       <main className="faculty-enroll-page">
         <header className="faculty-enroll-header">
           <div>
-            <Link to={`/faculty/courses/${encodeURIComponent(decodedCode)}/students`} className="faculty-enroll-back">
+            <Link
+              to={`/faculty/course-offerings/${resolvedOfferingId}/students`}
+              className="faculty-enroll-back"
+            >
               <ArrowLeft size={15} strokeWidth={2.6} />
               <span>Back to Students</span>
             </Link>
             <h1>Enroll New Student</h1>
-            <p>Add students to {courseTitle} ({decodedCode}) &bull; Academic Year 2023/24</p>
+            <p>
+              Add students to {courseOffering?.course_title || "Assigned Course"} ({courseCodeValue || "—"})
+              {" "}&bull; Academic Year {courseOffering?.academic_year || "Not available"}
+            </p>
+            {facultyProfile?.full_name && (
+              <small className="faculty-enroll-faculty-name">
+                Logged in as {facultyProfile.full_name}
+              </small>
+            )}
           </div>
-          <button type="button" onClick={submitEnrollment} disabled={selectedStudents.length === 0}>
+          <button type="button" onClick={submitEnrollment} disabled={submitDisabled}>
             <UserCheck size={16} strokeWidth={2.6} />
-            <span>Enroll Selected Students</span>
+            <span>{submitting ? "Enrolling..." : "Enroll Selected Students"}</span>
           </button>
         </header>
+
+        {errorMessage && (
+          <p className="faculty-enroll-message faculty-enroll-message--error" role="alert">
+            {errorMessage}
+          </p>
+        )}
+        {successMessage && (
+          <p className="faculty-enroll-message faculty-enroll-message--success" role="status">
+            {successMessage}
+          </p>
+        )}
+        {usingFallback && (
+          <p className="faculty-enroll-message">
+            No backend students were returned. Showing a local fallback preview.
+          </p>
+        )}
 
         <section className="faculty-enroll-summary" aria-label="Enrollment summary">
           <article>
             <span>Current Enrolled</span>
-            <strong>28 Students</strong>
+            <strong>{loading ? "—" : `${currentSeats} Students`}</strong>
             <Users size={18} />
           </article>
           <article>
             <span>Remaining Seats</span>
-            <strong>12 Available</strong>
+            <strong>{loading ? "—" : `${remainingSeats} Available`}</strong>
             <UserCheck size={18} />
           </article>
           <article>
             <span>Course Capacity</span>
-            <strong>28 / 40</strong>
+            <strong>{loading ? "—" : `${currentSeats} / ${courseCapacity}`}</strong>
             <BookOpen size={18} />
           </article>
           <article>
@@ -189,7 +279,7 @@ export default function EnrollStudent() {
               <select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)} aria-label="Level filter">
                 <option value="all">All Levels</option>
                 {levels.map((level) => (
-                  <option key={level} value={level}>{level}</option>
+                  <option key={level} value={level}>Level {level}</option>
                 ))}
               </select>
               <button type="button" className="faculty-enroll-export">
@@ -216,29 +306,38 @@ export default function EnrollStudent() {
                     </tr>
                   </thead>
                   <tbody>
+                    {!loading && filteredStudents.length === 0 && (
+                      <tr>
+                        <td className="faculty-enroll-table-empty" colSpan="6">
+                          No students match the selected filters.
+                        </td>
+                      </tr>
+                    )}
                     {filteredStudents.map((student) => {
-                      const selected = selectedIds.includes(student.id);
-                      const selectable = isSelectable(student);
+                      const selected = selectedStudentIds.includes(student.student_id);
+                      const selectable = student.is_selectable && !student.is_fallback;
 
                       return (
                         <tr
-                          key={student.id}
+                          key={student.student_id}
                           className={`${selected ? "is-selected" : ""} ${!selectable ? "is-disabled" : ""}`}
                           onClick={() => toggleStudent(student)}
+                          title={student.reason}
                         >
                           <td>
                             <span className="faculty-enroll-student-avatar">
-                              {student.name.split(" ").map((part) => part[0]).join("")}
+                              {getInitials(student.full_name)}
                             </span>
-                            <strong>{student.name}</strong>
+                            <strong>{student.full_name}</strong>
                           </td>
-                          <td>{student.id}</td>
-                          <td>{student.department}</td>
-                          <td><b>{student.gpa}</b></td>
+                          <td>{student.university_id}</td>
+                          <td>{student.department_name}</td>
+                          <td><b>{student.gpa_label}</b></td>
                           <td>
                             <span className={`faculty-enroll-status faculty-enroll-status--${getStatusClass(student.status)}`}>
-                              {student.status}
+                              {student.status_label}
                             </span>
+                            <small className="faculty-enroll-status-reason">{student.reason}</small>
                           </td>
                           <td>
                             <input
@@ -247,7 +346,7 @@ export default function EnrollStudent() {
                               disabled={!selectable}
                               onChange={() => toggleStudent(student)}
                               onClick={(event) => event.stopPropagation()}
-                              aria-label={`Select ${student.name}`}
+                              aria-label={`Select ${student.full_name}`}
                             />
                           </td>
                         </tr>
@@ -271,9 +370,9 @@ export default function EnrollStudent() {
               {selectedStudents.length > 0 ? (
                 <ul>
                   {selectedStudents.map((student) => (
-                    <li key={student.id}>
-                      <span>{student.name}</span>
-                      <small>{student.id}</small>
+                    <li key={student.student_id}>
+                      <span>{student.full_name}</span>
+                      <small>{student.university_id}</small>
                     </li>
                   ))}
                 </ul>
@@ -293,8 +392,13 @@ export default function EnrollStudent() {
               </div>
             </dl>
 
-            <button type="button" onClick={submitEnrollment} disabled={selectedStudents.length === 0}>
-              Confirm Enrollment
+            {selectionExceedsCapacity && (
+              <p className="faculty-enroll-capacity-warning">
+                Selected students exceed the remaining seats.
+              </p>
+            )}
+            <button type="button" onClick={submitEnrollment} disabled={submitDisabled}>
+              {submitting ? "Enrolling..." : "Confirm Enrollment"}
             </button>
           </aside>
         </section>

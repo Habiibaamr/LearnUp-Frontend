@@ -7,32 +7,21 @@ import {
 } from "../../../data/facultyCourses.js";
 import "./enrollStudent.css";
 
-const fallbackStudents = [
-  {
-    name: "Alex Morgan",
-    email: "alex.morgan@edu.com",
-    status: "Email Sent",
-  },
-  {
-    name: "Jamie Lee",
-    email: "j.lee@university.edu",
-    status: "Email Sent",
-  },
-];
-
 export default function EnrollmentSuccess() {
   const { courseCode } = useParams();
   const { state } = useLocation();
   const navigate = useNavigate();
   const course = getFacultyCourseByCode(courseCode);
   const decodedCode = state?.courseCode || course?.code || decodeCourseCode(courseCode);
-  const courseTitle = state?.courseTitle || course?.title || "Intro to Computing";
-  const enrolledStudents = state?.enrolledStudents?.length ? state.enrolledStudents : fallbackStudents;
-  const currentSeats = state?.currentSeats || 28;
-  const capacity = state?.capacity || 40;
+  const courseTitle = state?.courseTitle || course?.title || "Assigned Course";
+  const enrolledStudents = state?.enrolledStudents || [];
+  const currentSeats = Number(state?.currentSeats) || 0;
+  const capacity = Number(state?.capacity) || 0;
   const totalEnrolled = currentSeats + enrolledStudents.length;
-  const remainingSeats = capacity - totalEnrolled;
-  const capacityPercent = Math.round((totalEnrolled / capacity) * 100);
+  const remainingSeats = Math.max(0, capacity - totalEnrolled);
+  const capacityPercent = capacity > 0
+    ? Math.round((totalEnrolled / capacity) * 100)
+    : 0;
 
   return (
     <FacultyLayout>
