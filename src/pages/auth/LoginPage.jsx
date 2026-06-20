@@ -146,20 +146,32 @@ function LoginPage() {
     // Temporary demo authentication fallback: any non-empty password is accepted for
     // valid ERU institutional domains until backend auth is fully configured.
     const account = getOrCreateDemoAccountForLogin(role, email);
+    const demoAccount = {
+      ...account,
+      isDemo: true,
+      is_demo: true,
+    };
 
     if (role === "student") {
-      setSelectedStudentId(account.id);
+      setSelectedStudentId(demoAccount.id);
     }
 
     if (role === "faculty") {
-      setSelectedFacultyId(account.id);
+      setSelectedFacultyId(demoAccount.id);
+    }
+
+    try {
+      localStorage.setItem("learnup_current_user", JSON.stringify(demoAccount));
+    } catch {
+      // The role session below still keeps the demo login usable.
     }
 
     setLoginError("");
     setCurrentSession(role, {
-      email: account.email || email,
-      name: account.name || account.fullName || email,
-      userId: account.id || account.studentId || account.facultyId || account.adminId || "",
+      email: demoAccount.email || email,
+      name: demoAccount.name || demoAccount.fullName || email,
+      userId: demoAccount.id || demoAccount.studentId || demoAccount.facultyId || demoAccount.adminId || "",
+      isDemoSession: true,
     });
     navigate(getDashboardPathForRole(role), { replace: true });
   };
@@ -171,7 +183,7 @@ function LoginPage() {
       <main className="login-page__main">
         <section className="login-card">
           <div className="login-card__intro">
-            <h1>Welcome back!</h1>
+            <h1>Welcome</h1>
             <p>Please enter your details to sign in.</p>
           </div>
 

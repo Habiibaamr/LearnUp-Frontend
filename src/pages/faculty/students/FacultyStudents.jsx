@@ -103,17 +103,18 @@ export default function FacultyStudents() {
         gpaFilter === "all" ||
         (student.cgpa !== null && gpaFilter === "high" && student.cgpa >= 3.5) ||
         (student.cgpa !== null && gpaFilter === "mid" && student.cgpa >= 2.5 && student.cgpa < 3.5) ||
-        (student.cgpa !== null && gpaFilter === "risk" && student.cgpa < 2.5);
+        (student.cgpa !== null && gpaFilter === "follow-up" && student.cgpa >= 2 && student.cgpa < 2.5) ||
+        (student.cgpa !== null && gpaFilter === "risk" && student.cgpa < 2);
 
       return matchesQuery && matchesLevel && matchesStatus && matchesGpa;
     });
   }, [facultyStudents, gpaFilter, levelFilter, query, statusFilter]);
 
   const openStudentProfile = (student) => {
-    const studentId = student.university_id || student.student_id;
+    const studentId = student.university_id || student.student_id || student.user_id;
     setSelectedStudentId(studentId);
     navigate(`/faculty/student/profile/${encodeRecordId(studentId)}`, {
-      state: { studentId },
+      state: { studentId, student },
     });
   };
 
@@ -186,15 +187,17 @@ export default function FacultyStudents() {
               </select>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by status">
                 <option value="all">All Statuses</option>
-                <option value="EXCELLENT">Excellent</option>
-                <option value="NORMAL">Normal</option>
+                <option value="GOOD STANDING">Good Standing</option>
+                <option value="NEEDS FOLLOW-UP">Needs Follow-up</option>
                 <option value="AT RISK">At Risk</option>
+                <option value="PENDING / NO GPA DATA">Pending / No GPA Data</option>
               </select>
               <select value={gpaFilter} onChange={(event) => setGpaFilter(event.target.value)} aria-label="Filter by GPA range">
                 <option value="all">All GPA</option>
                 <option value="high">3.5 - 4.0</option>
                 <option value="mid">2.5 - 3.49</option>
-                <option value="risk">Below 2.5</option>
+                <option value="follow-up">2.0 - 2.49</option>
+                <option value="risk">Below 2.0</option>
               </select>
             </div>
           </div>

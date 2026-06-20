@@ -56,7 +56,7 @@ Notes:
 | `CourseBoard` | List/enroll/drop courses | Hardcoded course arrays and button-only state | `/student/me/course-board`, `/student/me/add-course/{course_offering_id}`, `/student/me/drop-course/{course_offering_id}` | GET/POST | path id for add/drop | Board/update result | Keep mock |
 | `AcademicMap` | Roadmap | Hardcoded `levels` | No direct endpoint confirmed | GET | unknown | Roadmap levels/courses | Keep mock |
 | `SemesterResult` | Results | `data/studentSemesterResults.js` | No direct semester-result endpoint confirmed | GET | unknown | Grades/GPA/credits | Keep mock |
-| `AcademicAdvisorBot` | Chat history/messages | Hardcoded `history`, `chips`, `initialMessages` | `/chat/start`, `/chat/my-sessions`, `/chat/{session_id}/message` | GET/POST | `{ message }` | Chat sessions/messages | Keep mock |
+| `AcademicAdvisorBot` | Chat history/messages | Local welcome/failure fallback only | `/chat/start`, `/chat/my-sessions`, `/chat/{session_id}/message`, `/chat/{session_id}/messages` | GET/POST | `{ message }` | Chat sessions/messages | Connected |
 | `StudentProfile` | Student details | `resolveStudentForSession`, `facultyStudents`, `learnupRecords.js` | `/student/v2/me/card`; faculty lookup may use `/instructor/students/{university_id}` | GET | path id for faculty lookup | Student profile/card | Keep mock |
 | `FacultyDashboard` | Faculty stats | `data/facultyStudents.js`, `learnupRecords.js` | `/instructor/my-offerings`, registrations endpoints | GET | offering id for registrations | Offerings/registration arrays | Keep mock |
 | `FacultyCourseBoard` | Faculty course cards | `data/facultyCourses.js` | `/instructor/my-offerings` | GET | none | Course offerings | Keep mock |
@@ -77,3 +77,13 @@ Notes:
 ## Deferred On Purpose
 
 Course Board, Academic Map, Semester Result, Faculty pages, assignment, enrollment, and profile hydration remain mocked until admin create/list is stable and backend IDs can be mapped safely.
+
+## AI Provider Boundary
+
+- This repository is the frontend only; no FastAPI/backend source is present here.
+- No OpenAI or Gemini key is stored or read by the frontend.
+- The frontend sends authenticated chat requests only to the LearnUp backend `/chat/*` endpoints.
+- The backend deployment must read `AI_PROVIDER`, `OPENAI_API_KEY`, or `GEMINI_API_KEY` from server environment variables.
+- If the backend provider is missing or invalid, it should still persist the chat messages and return:
+  `I can help with academic advising, but the AI service is not configured yet. Please contact your academic advisor.`
+- The frontend displays that same safe fallback if the backend chat request fails.

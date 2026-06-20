@@ -10,6 +10,10 @@ import {
   sortInstructorsForDemo,
 } from "../utils/instructorDisplay.js";
 import { decorateStudentDisplay, sortStudentsForDemo } from "../utils/studentDisplay.js";
+import {
+  getEffectiveGpa,
+  getPassedCreditHours,
+} from "../utils/studentAcademic.js";
 
 const optionalString = (value) => {
   const text = clean(value);
@@ -21,10 +25,26 @@ const parseLevel = (value) => {
   return match ? Number(match[0]) : undefined;
 };
 
-// Temporary backend IDs until faculty/advisor dropdowns are loaded from real endpoints.
-const DEMO_FACULTY_ID = 1;
 const DEMO_ADVISOR_INSTRUCTOR_ID = 1;
 const DEMO_PHONE = "01000000000";
+
+export const FACULTY_OPTIONS = [
+  { id: 1, label: "Faculty of Artificial Intelligence" },
+  { id: 2, label: "Faculty of Computer Science" },
+  { id: 3, label: "Faculty of Engineering & Technology" },
+  { id: 4, label: "Faculty of Information Systems" },
+];
+
+const getFacultyIdFromValue = (value) => {
+  const numeric = Number(value);
+
+  if (Number.isInteger(numeric) && numeric > 0) {
+    return numeric;
+  }
+
+  const normalized = clean(value).toLowerCase();
+  return FACULTY_OPTIONS.find((faculty) => faculty.label.toLowerCase() === normalized)?.id;
+};
 
 const getArrayPayload = (data, keys) => {
   if (Array.isArray(data)) {
@@ -48,14 +68,33 @@ const parseLoadValue = (load, index, fallback = 0) => {
 
 const getFirstNumber = (...values) => {
   for (const value of values) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+
     const numeric = Number(value);
 
-    if (Number.isFinite(numeric)) {
+    if (Number.isInteger(numeric) && numeric > 0) {
       return numeric;
     }
   }
 
   return undefined;
+};
+
+const getFirstFiniteNumber = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+
+  return null;
 };
 
 const getLoadCurrent = (source, courses, fallback) => {
@@ -143,17 +182,17 @@ const formatCourseLabel = (course) => {
 export const isMissingEndpointError = (error) => error?.status === 404;
 
 export function toCreateStudentPayload(formValues) {
+  const computedGpa = getEffectiveGpa(formValues);
+
   return {
     full_name: clean(formValues.fullName),
     email: clean(formValues.email),
     password: clean(formValues.initialPassword),
-    // TODO: Replace these demo IDs with values from real faculty and advisor
-    // dropdowns once those backend-backed options are available.
-    faculty_id: DEMO_FACULTY_ID,
+    faculty_id: getFacultyIdFromValue(formValues.faculty_id || formValues.faculty) || 1,
     department_id: getDepartmentIdFromValue(formValues.department),
     level: parseLevel(formValues.level) || 1,
-    cgpa: 0,
-    passed_credit_hours: 0,
+    cgpa: computedGpa === null ? null : Number(computedGpa.toFixed(2)),
+    passed_credit_hours: getPassedCreditHours(formValues),
     phone: optionalString(formValues.phone) || DEMO_PHONE,
     advisor_instructor_id: DEMO_ADVISOR_INSTRUCTOR_ID,
   };
@@ -163,7 +202,7 @@ export function toUpdateStudentPayload(formValues) {
   return {
     full_name: clean(formValues.fullName),
     email: clean(formValues.email),
-    faculty_id: DEMO_FACULTY_ID,
+    faculty_id: getFacultyIdFromValue(formValues.faculty_id || formValues.faculty) || 1,
     department_id: getDepartmentIdFromValue(formValues.department),
     level: parseLevel(formValues.level) || 1,
     phone: optionalString(formValues.phone) || DEMO_PHONE,
@@ -177,9 +216,7 @@ export function toCreateInstructorPayload(formValues) {
     full_name: clean(formValues.fullName),
     email: clean(formValues.email),
     password: clean(formValues.initialPassword),
-    // TODO: Replace this demo ID with a value from a real faculty dropdown once
-    // that backend-backed option is available.
-    faculty_id: DEMO_FACULTY_ID,
+    faculty_id: getFacultyIdFromValue(formValues.faculty_id || formValues.faculty),
     department_id: getDepartmentIdFromValue(formValues.department),
     specialization: optionalString(formValues.specialization) || "General Computing",
     office_location: optionalString(formValues.location) || "Campus office pending",
@@ -191,7 +228,7 @@ export function toUpdateInstructorPayload(formValues) {
   return {
     full_name: clean(formValues.fullName),
     email: clean(formValues.email),
-    faculty_id: DEMO_FACULTY_ID,
+    faculty_id: getFacultyIdFromValue(formValues.faculty_id || formValues.faculty),
     department_id: getDepartmentIdFromValue(formValues.department),
     specialization: optionalString(formValues.specialization) || "General Computing",
     office_location: optionalString(formValues.location) || "Campus office pending",
@@ -208,11 +245,23 @@ export async function createStudentAccount(payload) {
 }
 
 export async function updateStudentAccount(studentId, formValues) {
-  return apiClient.put(`/admin/students/${studentId}`, toUpdateStudentPayload(formValues));
+  const numericStudentId = getFirstNumber(studentId);
+
+  if (!numericStudentId) {
+    throw new Error("Student backend ID must be a valid integer.");
+  }
+
+  return apiClient.put(`/admin/students/${numericStudentId}`, toUpdateStudentPayload(formValues));
 }
 
 export async function deleteStudentAccount(studentId) {
-  return apiClient.delete(`/admin/students/${studentId}`);
+  const numericStudentId = getFirstNumber(studentId);
+
+  if (!numericStudentId) {
+    throw new Error("Student backend ID must be a valid integer.");
+  }
+
+  return apiClient.delete(`/admin/students/${numericStudentId}`);
 }
 
 export async function createInstructorAccount(formValues) {
@@ -220,15 +269,29 @@ export async function createInstructorAccount(formValues) {
 }
 
 export async function updateInstructorAccount(instructorId, formValues) {
-  return apiClient.put(`/admin/instructors/${instructorId}`, toUpdateInstructorPayload(formValues));
+  const numericInstructorId = getFirstNumber(instructorId);
+
+  if (!numericInstructorId) {
+    throw new Error("Faculty member backend ID must be a valid integer.");
+  }
+
+  return apiClient.put(`/admin/instructors/${numericInstructorId}`, toUpdateInstructorPayload(formValues));
 }
 
 export async function deleteInstructorAccount(instructorId) {
-  return apiClient.delete(`/admin/instructors/${instructorId}`);
+  const numericInstructorId = getFirstNumber(instructorId);
+
+  if (!numericInstructorId) {
+    throw new Error("Faculty member backend ID must be a valid integer.");
+  }
+
+  return apiClient.delete(`/admin/instructors/${numericInstructorId}`);
 }
 
 export function mapBackendStudent(record, fallback = {}, index = 0) {
   const source = record?.student || record?.user || record?.account || record || {};
+  const user = record?.user || source?.user || {};
+  const hasNestedStudent = Boolean(record?.student);
   const level = getNestedValue(source, ["level", "academic_level"]) || fallback.level;
   const department = getDepartmentDisplayName({ ...fallback, ...record }, index);
   const name =
@@ -246,10 +309,14 @@ export function mapBackendStudent(record, fallback = {}, index = 0) {
     getNestedValue(record?.student, ["student_id"]),
     getNestedValue(record?.student, ["id"]),
     getNestedValue(source, ["student_id"]),
-    getNestedValue(source, ["id"]),
     getNestedValue(record, ["student_id"]),
-    getNestedValue(record, ["id"]),
+    hasNestedStudent ? getNestedValue(source, ["id"]) : undefined,
+  );
+  const backendUserId = getFirstNumber(
+    getNestedValue(user, ["user_id", "id"]),
+    getNestedValue(source, ["user_id"]),
     getNestedValue(record, ["user_id"]),
+    getNestedValue(record, ["id"]),
   );
   const createdAt = getNestedValue(source, ["created_at", "createdAt"]) ||
     getNestedValue(record, ["created_at", "createdAt"]);
@@ -270,15 +337,40 @@ export function mapBackendStudent(record, fallback = {}, index = 0) {
     name,
     rawName: name,
     fullName: name,
-    email: clean(getNestedValue(source, ["email"]) || fallback.email),
+    email: clean(getNestedValue(source, ["email"]) || getNestedValue(user, ["email"]) || getNestedValue(record, ["email"]) || fallback.email),
     id: studentId,
     studentId,
     student_id: backendStudentId ?? studentId,
     backendStudentId,
-    userId: getFirstNumber(getNestedValue(source, ["user_id"]), getNestedValue(record, ["user_id", "id"])),
-    user_id: getFirstNumber(getNestedValue(source, ["user_id"]), getNestedValue(record, ["user_id", "id"])),
+    userId: backendUserId,
+    user_id: backendUserId,
     universityId: studentId,
     department_id: getFirstNumber(getNestedValue(source, ["department_id"]), getNestedValue(record, ["department_id"])),
+    faculty_id: getFirstNumber(getNestedValue(source, ["faculty_id"]), getNestedValue(record, ["faculty_id"])),
+    cgpa: getFirstFiniteNumber(
+      getNestedValue(source, ["cgpa", "gpa"]),
+      getNestedValue(record, ["cgpa", "gpa"]),
+    ),
+    gpa: getFirstFiniteNumber(
+      getNestedValue(source, ["cgpa", "gpa"]),
+      getNestedValue(record, ["cgpa", "gpa"]),
+      fallback.gpa,
+    ),
+    passed_credit_hours:
+      getNestedValue(source, ["passed_credit_hours", "completed_credit_hours"]) ??
+      getNestedValue(record, ["passed_credit_hours", "completed_credit_hours"]) ??
+      fallback.passed_credit_hours ??
+      null,
+    advisor_instructor_id: getFirstNumber(
+      getNestedValue(source, ["advisor_instructor_id"]),
+      getNestedValue(record, ["advisor_instructor_id"]),
+    ),
+    advisor_name: clean(
+      getNestedValue(source, ["advisor_name"]) ||
+      getNestedValue(record, ["advisor_name"]) ||
+      fallback.advisor_name ||
+      fallback.advisor,
+    ),
     isSeed: getNestedValue(source, ["is_seed", "seed", "is_demo", "demo"]) ||
       getNestedValue(record, ["is_seed", "seed", "is_demo", "demo"]),
     createdByAdminId,
@@ -287,6 +379,7 @@ export function mapBackendStudent(record, fallback = {}, index = 0) {
     phone: clean(getNestedValue(source, ["phone"]) || fallback.phone),
     level: Number.isFinite(Number(level)) ? `Level ${Number(level)}` : level || "Level 1",
     department,
+    backendRecord: record,
     sortIndex: index,
   }, index);
 }
@@ -294,6 +387,7 @@ export function mapBackendStudent(record, fallback = {}, index = 0) {
 export function mapBackendInstructor(record, fallback = {}, index = 0) {
   const source = record?.instructor || record?.user || record?.account || record || {};
   const user = record?.user || source.user || {};
+  const hasNestedInstructor = Boolean(record?.instructor);
   const officeLocation =
     getNestedValue(source, ["office_location", "officeLocation", "location"]) ||
     getNestedValue(record, ["office_location", "officeLocation", "location"]) ||
@@ -316,11 +410,26 @@ export function mapBackendInstructor(record, fallback = {}, index = 0) {
     getNestedValue(record?.instructor, ["instructor_id"]),
     getNestedValue(record?.instructor, ["id"]),
     getNestedValue(source, ["instructor_id"]),
-    getNestedValue(source, ["id"]),
     getNestedValue(record, ["instructor_id"]),
-    getNestedValue(record, ["id"]),
+    hasNestedInstructor ? getNestedValue(source, ["id"]) : undefined,
+  );
+  const backendUserId = getFirstNumber(
+    getNestedValue(user, ["user_id", "id"]),
     getNestedValue(source, ["user_id"]),
     getNestedValue(record, ["user_id"]),
+    !hasNestedInstructor ? getNestedValue(record, ["id"]) : undefined,
+  );
+  const academicPosition = clean(
+    getNestedValue(source, ["academic_position", "academicPosition", "title", "position"]) ||
+    getNestedValue(record, ["academic_position", "academicPosition", "title", "position"]) ||
+    fallback.academicPosition ||
+    fallback.title,
+  );
+  const actualRole = clean(
+    getNestedValue(source, ["role", "instructor_role", "faculty_role"]) ||
+    getNestedValue(user, ["role", "user_role"]) ||
+    getNestedValue(record, ["role", "instructor_role", "faculty_role"]) ||
+    fallback.role,
   );
   const createdAt = getNestedValue(source, ["created_at", "createdAt"]) ||
     getNestedValue(record, ["created_at", "createdAt"]);
@@ -366,6 +475,8 @@ export function mapBackendInstructor(record, fallback = {}, index = 0) {
     instructorId,
     instructor_id: backendInstructorId ?? instructorId,
     backendInstructorId,
+    userId: backendUserId,
+    user_id: backendUserId,
     universityId: instructorId,
     isSeed: getNestedValue(source, ["is_seed", "seed", "is_demo", "demo"]) ||
       getNestedValue(record, ["is_seed", "seed", "is_demo", "demo"]),
@@ -374,8 +485,14 @@ export function mapBackendInstructor(record, fallback = {}, index = 0) {
     createdAt,
     department,
     faculty,
-    title: clean(getNestedValue(source, ["title", "position"]) || fallback.title) || "Faculty Member",
-    role: clean(getNestedValue(source, ["role"]) || fallback.role) || "Faculty Member",
+    faculty_id: getFirstNumber(
+      getNestedValue(source, ["faculty_id"]),
+      getNestedValue(record, ["faculty_id"]),
+    ),
+    title: academicPosition || actualRole || "Faculty Member",
+    academicPosition: academicPosition || actualRole || "Faculty Member",
+    academic_position: academicPosition || "",
+    role: actualRole || academicPosition || "Faculty Member",
     specialization: clean(getNestedValue(source, ["specialization"]) || fallback.specialization),
     location: clean(officeLocation) || "Campus office pending",
     phone: clean(getNestedValue(source, ["phone"]) || getNestedValue(user, ["phone"]) || fallback.phone),
@@ -384,6 +501,7 @@ export function mapBackendInstructor(record, fallback = {}, index = 0) {
     hasDirectCourseLoadData: hasDirectCourseLoadSource(source),
     courses,
     progress,
+    backendRecord: record,
     sortIndex: index,
   }, index);
 }

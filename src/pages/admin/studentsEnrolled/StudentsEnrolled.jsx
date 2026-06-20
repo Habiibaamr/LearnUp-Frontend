@@ -89,12 +89,6 @@ const Icons = {
       <path d="m21 21-4.35-4.35" />
     </Icon>
   ),
-  bell: (
-    <Icon size={21}>
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </Icon>
-  ),
   filter: (
     <Icon size={18}>
       <path d="M3 5h18" />
@@ -298,13 +292,6 @@ function StudentsEnrolled() {
           </label>
 
           <div className="students-top-profile">
-            <button
-              className="students-notification-button"
-              type="button"
-              aria-label="Notifications"
-            >
-              {Icons.bell}
-            </button>
             <button type="button" className="students-top-profile-button" onClick={() => navigate("/admin/profile")}>
               <span className="students-admin-user">
                 <span>Executive Admin</span>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bot,
   Image,
@@ -12,53 +12,24 @@ import {
   Trash2,
 } from "lucide-react";
 import StudentSidebar from "../../../components/student/StudentSidebar.jsx";
+import {
+  getChatMessages,
+  listChatSessions,
+  sendChatMessage,
+  startChatSession,
+} from "../../../services/chatbot.js";
 import "./academicAdvisorBot.css";
 
-// Mock chat history/messages stay in place until authenticated chat endpoints are wired.
-const history = [
-  {
-    title: "Today",
-    items: [
-      { title: "K-means Clustering Basics", meta: '"Explain the distance formula..."', active: true },
-      { title: "Calculus HW Help", meta: "10:45 AM" },
-    ],
-  },
-  {
-    title: "Yesterday",
-    items: [
-      { title: "Linear Algebra Recap", meta: "Yesterday, 04:20 PM" },
-      { title: "Study Schedule Generator", meta: "Yesterday, 09:12 AM" },
-    ],
-  },
-  {
-    title: "Last 7 Days",
-    items: [
-      { title: "Python Library Pandas", meta: "Oct 24, 2023" },
-      { title: "Art History Essay Outline", meta: "Oct 22, 2023" },
-    ],
-  },
-];
-
 const chips = ["When is my next quiz?", "Explain K-means clustering", "Show my grades", "Help with Calculus"];
+const AI_NOT_CONFIGURED_MESSAGE =
+  "I can help with academic advising, but the AI service is not configured yet. Please contact your academic advisor.";
 
 const initialMessages = [
   {
-    id: 1,
+    id: "welcome",
     sender: "bot",
-    meta: "Learnbot • 10:48 AM",
-    text: "Hello Alex! I've analyzed your upcoming assignments. You have a quiz on Machine Learning Algorithms this Thursday at 2:00 PM. Would you like to start a practice session or review specific concepts like K-means clustering?",
-  },
-  {
-    id: 2,
-    sender: "user",
-    meta: "You • 10:49 AM",
-    text: "Yes, please. Can you explain K-means clustering in simple terms? I'm specifically struggling with how the 'K' is initially chosen.",
-  },
-  {
-    id: 3,
-    sender: "bot",
-    meta: "Learnbot • 10:50 AM",
-    text: "Great question! Think of K-means clustering like trying to group people at a party into 'K' different conversation circles.\n\nChoosing 'K' is often the trickiest part. Here are the most common ways we do it:\n\nWe test different values and look for the 'bend' in a graph.\n\nSometimes we already know how many groups we need (e.g., T-shirt sizes: S, M, L).\n\nDomain Knowledge:\n\nA mathematical way to see how well each point fits in its group.",
+    meta: "Learnbot",
+    text: "Hello! I can help with courses, academic planning, grades, and study questions. What would you like to work on?",
   },
 ];
 
@@ -67,7 +38,7 @@ function BotAvatar() {
 }
 
 function UserAvatar() {
-  return <span className="advisor-user-avatar" aria-label="Alex Rivera" role="img" />;
+  return <span className="advisor-user-avatar" aria-label="Student" role="img" />;
 }
 
 function Message({ message }) {
@@ -90,20 +61,135 @@ export default function AcademicAdvisorBot() {
   const [search, setSearch] = useState("");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState(initialMessages);
+  const [sessions, setSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [loadingReply, setLoadingReply] = useState(false);
+  const [chatError, setChatError] = useState("");
 
-  const sendMessage = (text) => {
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadHistory() {
+      try {
+        const chatSessions = await listChatSessions();
+        if (!isMounted) return;
+
+        setSessions(chatSessions);
+        const latestSessionId = chatSessions.at(-1)?.session_id;
+
+        if (latestSessionId) {
+          const storedMessages = await getChatMessages(latestSessionId);
+          if (isMounted) {
+            setActiveSessionId(latestSessionId);
+            if (storedMessages.length) {
+              setMessages(storedMessages);
+            }
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setChatError("Chat history is temporarily unavailable. You can still start a new message.");
+        }
+      }
+    }
+
+    loadHistory();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredSessions = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return sessions.filter((session) => (
+      !query ||
+      `chat ${session.session_id}`.includes(query) ||
+      String(session.started_at || "").toLowerCase().includes(query)
+    ));
+  }, [search, sessions]);
+
+  const openSession = async (sessionId) => {
+    try {
+      setChatError("");
+      const storedMessages = await getChatMessages(sessionId);
+      setActiveSessionId(sessionId);
+      setMessages(storedMessages.length ? storedMessages : initialMessages);
+    } catch {
+      setChatError("This conversation could not be loaded right now.");
+    }
+  };
+
+  const createNewChat = async () => {
+    try {
+      setChatError("");
+      const sessionId = await startChatSession();
+      setActiveSessionId(sessionId);
+      setSessions((current) => [
+        ...current,
+        { session_id: sessionId, started_at: new Date().toISOString() },
+      ]);
+      setMessages(initialMessages);
+    } catch {
+      setActiveSessionId(null);
+      setMessages(initialMessages);
+      setChatError("Learnbot is temporarily offline. Your dashboard and login are not affected.");
+    }
+  };
+
+  const sendMessageToBot = async (text) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || loadingReply) return;
+
     setMessages((current) => [
       ...current,
-      { id: Date.now(), sender: "user", meta: "You • now", text: trimmed },
+      { id: `user-${Date.now()}`, sender: "user", meta: "You • now", text: trimmed },
     ]);
     setInput("");
+    setChatError("");
+    setLoadingReply(true);
+
+    try {
+      let sessionId = activeSessionId;
+
+      if (!sessionId) {
+        sessionId = await startChatSession();
+        setActiveSessionId(sessionId);
+        setSessions((current) => [
+          ...current,
+          { session_id: sessionId, started_at: new Date().toISOString() },
+        ]);
+      }
+
+      const response = await sendChatMessage(sessionId, trimmed);
+      setActiveSessionId(response.sessionId);
+      setMessages((current) => [
+        ...current,
+        {
+          ...response.assistantMessage,
+          meta: "Learnbot • now",
+          text: response.assistantMessage.text || AI_NOT_CONFIGURED_MESSAGE,
+        },
+      ]);
+    } catch {
+      setMessages((current) => [
+        ...current,
+        {
+          id: `fallback-${Date.now()}`,
+          sender: "bot",
+          meta: "Learnbot • now",
+          text: AI_NOT_CONFIGURED_MESSAGE,
+        },
+      ]);
+      setChatError("Learnbot is temporarily unavailable. Your other LearnUp pages will continue to work.");
+    } finally {
+      setLoadingReply(false);
+    }
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    sendMessage(input);
+    sendMessageToBot(input);
   };
 
   return (
@@ -113,7 +199,7 @@ export default function AcademicAdvisorBot() {
       <aside className="advisor-history">
         <header>
           <h1>History</h1>
-          <button type="button" aria-label="New chat"><SquarePlus size={22} /></button>
+          <button type="button" aria-label="New chat" onClick={createNewChat}><SquarePlus size={22} /></button>
         </header>
 
         <label className="advisor-history__search">
@@ -127,25 +213,32 @@ export default function AcademicAdvisorBot() {
         </label>
 
         <div className="advisor-history__list">
-          {history.map((section) => (
-            <section key={section.title}>
-              <h2>{section.title}</h2>
-              {section.items.map((item) => (
-                <button
-                  key={item.title}
-                  type="button"
-                  className={item.active ? "is-active" : ""}
-                >
-                  <strong>{item.title}</strong>
-                  <span>{item.meta}</span>
-                </button>
-              ))}
-            </section>
-          ))}
+          <section>
+            <h2>Recent Conversations</h2>
+            {filteredSessions.map((session) => (
+              <button
+                key={session.session_id}
+                type="button"
+                className={activeSessionId === session.session_id ? "is-active" : ""}
+                onClick={() => openSession(session.session_id)}
+              >
+                <strong>Chat {session.session_id}</strong>
+                <span>{session.started_at ? new Date(session.started_at).toLocaleDateString() : "Recent"}</span>
+              </button>
+            ))}
+            {!filteredSessions.length && <span>No saved conversations yet.</span>}
+          </section>
         </div>
 
-        <button type="button" className="advisor-history__clear" onClick={() => setMessages([])}>
-          Clear Chat History
+        <button
+          type="button"
+          className="advisor-history__clear"
+          onClick={() => {
+            setActiveSessionId(null);
+            setMessages(initialMessages);
+          }}
+        >
+          Clear Current Chat
           <Trash2 size={16} />
         </button>
       </aside>
@@ -164,7 +257,7 @@ export default function AcademicAdvisorBot() {
 
         <div className="advisor-chat__chips">
           {chips.map((chip) => (
-            <button key={chip} type="button" onClick={() => sendMessage(chip)}>
+            <button key={chip} type="button" onClick={() => sendMessageToBot(chip)}>
               {chip}
             </button>
           ))}
@@ -172,13 +265,15 @@ export default function AcademicAdvisorBot() {
 
         <main className="advisor-chat__messages">
           {messages.map((message) => <Message key={message.id} message={message} />)}
-          {messages.length > 0 && (
+          {loadingReply && (
             <div className="advisor-typing">
               <BotAvatar />
               <span><i /><i /><i /></span>
             </div>
           )}
         </main>
+
+        {chatError && <p className="advisor-disclaimer" role="status">{chatError}</p>}
 
         <form className="advisor-composer" onSubmit={handleSubmit}>
           <div>
@@ -196,7 +291,7 @@ export default function AcademicAdvisorBot() {
               <small>Press Enter to send</small>
             </footer>
           </div>
-          <button type="submit" aria-label="Send">
+          <button type="submit" aria-label="Send" disabled={loadingReply}>
             <SendHorizontal size={23} />
           </button>
         </form>

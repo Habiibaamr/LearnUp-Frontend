@@ -19,12 +19,25 @@ import {
   setSelectedStudentId,
 } from "../../../../utils/learnupRecords.js";
 import { DEPARTMENT_FILTER_OPTIONS, DEPARTMENT_OPTIONS } from "../../../../utils/departments.js";
+import {
+  getEffectiveGpa,
+  getRiskStatus,
+} from "../../../../utils/studentAcademic.js";
 import "./createStudent.css";
 
 const levels = ["All Levels", "Level 1", "Level 2", "Level 3", "Level 4"];
 const departments = DEPARTMENT_FILTER_OPTIONS;
 const genderOptions = ["Male", "Female"];
 const PAGE_SIZE = 10;
+
+const getNumericId = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
+    const numeric = Number(value);
+    if (Number.isInteger(numeric) && numeric > 0) return numeric;
+  }
+  return null;
+};
 
 const getInitialStudentForm = () => ({
   fullName: "",
@@ -39,10 +52,36 @@ const getInitialStudentForm = () => ({
 });
 
 const getStudentBackendId = (student) =>
-  student?.backendStudentId || student?.student_id || student?.studentIdNumeric || student?.userId || student?.user_id || student?.id;
+  getNumericId(
+    student?.backendStudentId,
+    student?.student_id,
+    student?.studentIdNumeric,
+    student?.backendRecord?.student?.student_id,
+    student?.backendRecord?.student_id,
+  );
 
-const getStudentProfileId = (student) =>
-  student?.backendStudentId || student?.student_id || student?.userId || student?.user_id || student?.universityId || student?.id;
+const getStudentUserId = (student) =>
+  getNumericId(
+    student?.userId,
+    student?.user_id,
+    student?.backendRecord?.user?.user_id,
+    student?.backendRecord?.user?.id,
+    student?.backendRecord?.user_id,
+    student?.backendRecord?.id,
+  );
+
+const getStudentProfileTarget = (student) => {
+  const studentId = getStudentBackendId(student);
+  const userId = getStudentUserId(student);
+  const universityId = student?.universityId || student?.university_id || student?.studentId || student?.id;
+
+  return {
+    profileId: studentId || userId || universityId,
+    profileIdType: studentId ? "student_id" : userId ? "user_id" : "university_id",
+    studentId,
+    userId,
+  };
+};
 
 const studentToForm = (student) => ({
   ...getInitialStudentForm(),
@@ -283,11 +322,17 @@ export default function CreateStudent() {
   }, [totalPages]);
 
   const openStudentProfile = (student) => {
-    const profileId = getStudentProfileId(student);
+    const { profileId, profileIdType, studentId, userId } = getStudentProfileTarget(student);
 
     setSelectedStudentId(student.id);
     navigate(`/admin/student/profile/${encodeRecordId(profileId)}`, {
-      state: { studentId: profileId, student },
+      state: {
+        studentId: profileId,
+        student,
+        backendStudentId: studentId,
+        userId,
+        profileIdType,
+      },
     });
   };
 
@@ -309,8 +354,9 @@ export default function CreateStudent() {
       }
 
       setOpen(false);
-      navigate(`/admin/student-created/${encodeRecordId(student.id)}`, {
-        state: { createdStudent: student, studentId: student.id },
+      const { profileId } = getStudentProfileTarget(student);
+      navigate(`/admin/student-created/${encodeRecordId(profileId)}`, {
+        state: { createdStudent: student, studentId: profileId },
       });
     } catch (error) {
       setSubmitError(error?.message || "Student could not be created. Please try again.");
@@ -425,11 +471,17 @@ export default function CreateStudent() {
                   <th>STUDENT ID</th>
                   <th>LEVEL</th>
                   <th>DEPARTMENT</th>
+                  <th>GPA</th>
+                  <th>STATUS</th>
                   <th>ACTION</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedStudents.map((student) => (
+                {paginatedStudents.map((student) => {
+                  const gpa = getEffectiveGpa(student);
+                  const risk = getRiskStatus(gpa);
+
+                  return (
                   <tr key={student.id} onClick={() => openStudentProfile(student)} className="student-table-row">
                     <td>
                       <span className="student-table-avatar">{getInitials(student.name)}</span>
@@ -438,6 +490,8 @@ export default function CreateStudent() {
                     <td>{student.id}</td>
                     <td><span className="student-level-pill">{student.level}</span></td>
                     <td>{student.department}</td>
+                    <td><strong>{gpa === null ? "-" : gpa.toFixed(2)}</strong></td>
+                    <td><span className="student-level-pill">{risk.label}</span></td>
                     <td className="student-actions-cell">
                       <button
                         type="button"
@@ -490,7 +544,8 @@ export default function CreateStudent() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <footer>

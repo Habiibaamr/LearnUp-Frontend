@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import LoginPage from "./pages/auth/LoginPage.jsx";
+import IntroPage from "./pages/auth/IntroPage.jsx";
 import RegisterPage from "./pages/auth/RegisterPage.jsx";
 import ForgotPassword from "./pages/auth/forgotPassword/ForgotPassword.jsx";
 import AssignInstructorPage from "./pages/admin/dashboard/assignInstructor/AssignInstructor.jsx";
@@ -15,6 +16,7 @@ import CourseBoard from "./pages/student/courseBoard/CourseBoard.jsx";
 import AcademicMap from "./pages/student/academicMap/AcademicMap.jsx";
 import SemesterResult from "./pages/student/semesterResult/SemesterResult.jsx";
 import AcademicAdvisorBot from "./pages/student/academicAdvisorBot/AcademicAdvisorBot.jsx";
+import DegreeAudit from "./pages/student/degreeAudit/DegreeAudit.jsx";
 import StudentProfile from "./pages/student/profile/StudentProfile.jsx";
 import FacultyProfile from "./pages/faculty/profile/FacultyProfile.jsx";
 import AdminProfile from "./pages/admin/profile/AdminProfile.jsx";
@@ -71,6 +73,10 @@ function RequireRole({ role, children }) {
   }
 
   if (role === "faculty") {
+    if (session.isDemoSession) {
+      return children;
+    }
+
     const tokenState = getFacultyTokenState();
 
     if (!tokenState.token || tokenState.expired) {
@@ -108,7 +114,8 @@ const requireRole = (role, element) => (
 export function LearnUpRoutes() {
   return (
     <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<IntroPage />} />
+        <Route path="/intro" element={<IntroPage />} />
         <Route path="/who-are-you" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/admin/login" element={<Navigate to="/login" replace />} />
@@ -164,6 +171,7 @@ export function LearnUpRoutes() {
         <Route path="/student/dashboard" element={requireRole("student", <StudentDashboard />)} />
         <Route path="/student/course-board" element={requireRole("student", <CourseBoard />)} />
         <Route path="/student/academic-map" element={requireRole("student", <AcademicMap />)} />
+        <Route path="/student/degree-audit" element={requireRole("student", <DegreeAudit />)} />
         <Route path="/student/semester-result" element={requireRole("student", <SemesterResult />)} />
         <Route path="/student/academic-advisor-bot" element={requireRole("student", <AcademicAdvisorBot />)} />
         <Route path="/student/profile" element={requireRole("student", <StudentProfile />)} />

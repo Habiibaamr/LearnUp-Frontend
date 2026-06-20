@@ -92,38 +92,37 @@ export default function FacultyDashboard() {
     const studentsWithGpa = facultyStudents.filter((student) => student.cgpa !== null);
     const counts = studentsWithGpa.reduce(
       (summary, student) => {
-        if (student.cgpa >= 3.5) {
-          summary.excellent += 1;
-        } else if (student.cgpa >= 3) {
-          summary.veryGood += 1;
-        } else if (student.cgpa >= 2.5) {
-          summary.good += 1;
+        if (student.cgpa >= 2.5) {
+          summary.goodStanding += 1;
+        } else if (student.cgpa >= 2) {
+          summary.needsFollowUp += 1;
         } else {
           summary.atRisk += 1;
         }
         return summary;
       },
-      { excellent: 0, veryGood: 0, good: 0, atRisk: 0 },
+      { goodStanding: 0, needsFollowUp: 0, atRisk: 0 },
     );
     const total = studentsWithGpa.length;
-    const excellentEnd = total ? (counts.excellent / total) * 100 : 0;
-    const veryGoodEnd = total ? excellentEnd + (counts.veryGood / total) * 100 : 0;
-    const goodEnd = total ? veryGoodEnd + (counts.good / total) * 100 : 0;
+    const goodEnd = total ? (counts.goodStanding / total) * 100 : 0;
+    const followUpEnd = total
+      ? goodEnd + (counts.needsFollowUp / total) * 100
+      : 0;
 
     return {
       ...counts,
       total,
       donutBackground: total
-        ? `conic-gradient(#0b5ad1 0 ${excellentEnd}%, #9fbbff ${excellentEnd}% ${veryGoodEnd}%, #4f46e5 ${veryGoodEnd}% ${goodEnd}%, #ef4444 ${goodEnd}% 100%)`
+        ? `conic-gradient(#0b5ad1 0 ${goodEnd}%, #f59e0b ${goodEnd}% ${followUpEnd}%, #ef4444 ${followUpEnd}% 100%)`
         : "#e5e7eb",
     };
   }, [facultyStudents]);
 
   const openStudentProfile = (student) => {
-    const studentId = student.university_id || student.student_id;
+    const studentId = student.university_id || student.student_id || student.user_id;
     setSelectedStudentId(studentId);
     navigate(`/faculty/student/profile/${encodeRecordId(studentId)}`, {
-      state: { studentId },
+      state: { studentId, student },
     });
   };
 
@@ -262,23 +261,22 @@ export default function FacultyDashboard() {
               </div>
             </div>
             <ul className="faculty-gpa-legend">
-              <li><i className="legend-excellent" />Excellent ({gpaSummary.excellent})</li>
-              <li><i className="legend-very-good" />Very Good ({gpaSummary.veryGood})</li>
-              <li><i className="legend-good" />Good ({gpaSummary.good})</li>
+              <li><i className="legend-excellent" />Good Standing ({gpaSummary.goodStanding})</li>
+              <li><i className="legend-very-good" />Needs Follow-up ({gpaSummary.needsFollowUp})</li>
               <li><i className="legend-risk" />At Risk ({gpaSummary.atRisk})</li>
             </ul>
             <div className="faculty-gpa-summary">
               <article>
-                <span>EXCELLENT</span>
-                <strong>3.5 - 4 GPA</strong>
+                <span>GOOD STANDING</span>
+                <strong>2.5 - 4 GPA</strong>
               </article>
               <article>
-                <span>VERY GOOD / GOOD</span>
-                <strong>2.5 - 3.49 GPA</strong>
+                <span>NEEDS FOLLOW-UP</span>
+                <strong>2.0 - 2.49 GPA</strong>
               </article>
               <article>
                 <span>AT RISK STUDENTS</span>
-                <strong>Less than 2.5 GPA</strong>
+                <strong>Less than 2.0 GPA</strong>
               </article>
             </div>
           </div>

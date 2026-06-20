@@ -12,14 +12,23 @@ import { facultyStudents } from "../../../data/facultyStudents.js";
 import { mapBackendStudent } from "../../../services/adminAccounts.js";
 import { apiClient } from "../../../services/apiClient.js";
 import {
+  fetchCurrentStudentProfile,
+  readStoredStudentProfile,
+} from "../../../services/studentProfile.js";
+import {
   findStudentById,
+  findStudentByEmail,
   getCurrentSession,
   getInitials,
   getSelectedStudent,
-  resolveStudentForSession,
   setSelectedStudentId,
 } from "../../../utils/learnupRecords.js";
 import { getDepartmentDisplayName } from "../../../utils/departments.js";
+import {
+  getEffectiveGpa,
+  getPassedCreditHours,
+  getRiskStatus,
+} from "../../../utils/studentAcademic.js";
 import "./studentProfile.css";
 
 const enrollmentRows = [
@@ -66,19 +75,28 @@ const getArrayPayload = (data, keys) => {
 const getStudentSources = (record) =>
   [record, record?.student, record?.user, record?.account].filter(Boolean);
 
-const getNumericValue = (record, keys) => {
-  for (const source of getStudentSources(record)) {
-    for (const key of keys) {
-      const numeric = Number(source?.[key]);
-
-      if (Number.isFinite(numeric)) {
-        return numeric;
-      }
-    }
-  }
-
-  return null;
+const toNumericId = (value) => {
+  const numeric = Number(value);
+  return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
 };
+
+const getStudentBackendId = (record) =>
+  toNumericId(
+    record?.student?.student_id ??
+    record?.student?.id ??
+    record?.student_id ??
+    record?.backendStudentId,
+  );
+
+const getStudentUserId = (record) =>
+  toNumericId(
+    record?.user?.user_id ??
+    record?.user?.id ??
+    record?.user_id ??
+    record?.userId ??
+    record?.student?.user_id ??
+    (record?.student ? record?.id : undefined),
+  );
 
 const getUniversityId = (record) => {
   for (const source of getStudentSources(record)) {
@@ -92,25 +110,63 @@ const getUniversityId = (record) => {
   return "";
 };
 
-const matchesStudentProfileId = (record, profileId) => {
+const matchesStudentProfileId = (record, profileId, profileIdType = "") => {
   const normalizedProfileId = normalizeKey(profileId);
-  const numericProfileId = Number(profileId);
+  const numericProfileId = toNumericId(profileId);
 
   if (!normalizedProfileId) {
     return false;
   }
 
-  if (normalizeKey(getUniversityId(record)) === normalizedProfileId) {
+  if (
+    (!profileIdType || profileIdType === "university_id") &&
+    normalizeKey(getUniversityId(record)) === normalizedProfileId
+  ) {
     return true;
   }
 
-  if (!Number.isFinite(numericProfileId)) {
+  if (numericProfileId === null) {
     return false;
   }
 
-  return ["student_id", "id", "user_id"].some(
-    (key) => getNumericValue(record, [key]) === numericProfileId,
+  if (profileIdType === "student_id") {
+    return getStudentBackendId(record) === numericProfileId;
+  }
+
+  if (profileIdType === "user_id") {
+    return getStudentUserId(record) === numericProfileId;
+  }
+
+  return (
+    getStudentBackendId(record) === numericProfileId ||
+    getStudentUserId(record) === numericProfileId
   );
+};
+
+const findStudentForProfile = (students, profileId, profileIdType = "") => {
+  if (profileIdType) {
+    return students.find((student) =>
+      matchesStudentProfileId(student, profileId, profileIdType),
+    ) || null;
+  }
+
+  const numericProfileId = toNumericId(profileId);
+
+  if (numericProfileId !== null) {
+    const studentIdMatch = students.find(
+      (student) => getStudentBackendId(student) === numericProfileId,
+    );
+    if (studentIdMatch) return studentIdMatch;
+
+    const userIdMatch = students.find(
+      (student) => getStudentUserId(student) === numericProfileId,
+    );
+    if (userIdMatch) return userIdMatch;
+  }
+
+  return students.find(
+    (student) => normalizeKey(getUniversityId(student)) === normalizeKey(profileId),
+  ) || null;
 };
 
 const getStateStudent = (state) =>
@@ -144,62 +200,25 @@ function parseNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function getCredits(student) {
-  const savedHours = parseNumber(student?.totalHoursPassed, 0);
-
-  if (savedHours > 0) {
-    return Math.min(120, Math.round(savedHours));
-  }
-
-  if (student?.level?.includes("4")) return 102;
-  if (student?.level?.includes("3")) return 78;
-  if (student?.level?.includes("2")) return 48;
-  return 24;
-}
-
-function getAttendance(student) {
+function getAttendance(student, effectiveGpa) {
   const attendance = parseNumber(student?.attendance, 0);
-  const gpa = parseNumber(student?.gpa, 3);
 
   if (attendance > 0) {
     return Math.round(attendance);
   }
 
-  if (gpa >= 3.5) return 96;
-  if (gpa >= 2.5) return 88;
+  if (effectiveGpa === null) return 0;
+  if (effectiveGpa >= 3.5) return 96;
+  if (effectiveGpa >= 2.5) return 88;
   return 68;
 }
 
-function getRisk(student) {
-  const gpa = parseNumber(student?.gpa, 0);
-
-  if (gpa < 2.5) {
-    return { label: "High Risk", className: "high" };
-  }
-
-  if (gpa < 3) {
-    return { label: "Medium Risk", className: "medium" };
-  }
-
-  return { label: "Low Risk", className: "low" };
-}
-
-function getLearnerStatus(student) {
-  const status = normalizeKey(student?.status || student?.academicStatus);
-
-  if (status.includes("risk")) {
-    return "Needs Support";
-  }
-
-  if (status.includes("excellent")) {
-    return "Excellent Learner";
-  }
-
-  return "Active Learner";
-}
-
 function buildTrend(gpa) {
-  const current = parseNumber(gpa, 3.2);
+  if (gpa === null) {
+    return [];
+  }
+
+  const current = gpa;
   return [
     Math.max(1.5, current - 0.45),
     Math.max(1.5, current - 0.25),
@@ -214,14 +233,22 @@ export default function StudentProfile() {
   const { state } = useLocation();
   const session = getCurrentSession();
   const stateStudent = getStateStudent(state);
+  const profileIdType = clean(state?.profileIdType);
   const profileUrlId = decodeURIComponent(clean(studentId || state?.studentId || stateStudent?.backendStudentId || stateStudent?.student_id || stateStudent?.universityId || stateStudent?.id));
   const localStudent = useMemo(
-    () =>
-      findProfileStudent(profileUrlId) ||
-      findProfileStudent(state?.studentId) ||
-      getSelectedStudent() ||
-      resolveStudentForSession(session?.email),
-    [profileUrlId, session?.email, state?.studentId],
+    () => {
+      if (session?.role === "student") {
+        return readStoredStudentProfile() || findStudentByEmail(session?.email);
+      }
+
+      return (
+        stateStudent ||
+        findProfileStudent(profileUrlId) ||
+        findProfileStudent(state?.studentId) ||
+        (profileUrlId ? getSelectedStudent() : null)
+      );
+    },
+    [profileUrlId, session?.email, session?.role, state?.studentId, stateStudent],
   );
   const [backendStudent, setBackendStudent] = useState(null);
   const [backendLoaded, setBackendLoaded] = useState(false);
@@ -234,6 +261,28 @@ export default function StudentProfile() {
     let isMounted = true;
 
     async function loadStudentProfile() {
+      if (session?.role === "student") {
+        try {
+          setBackendLoaded(false);
+          setBackendError("");
+          const currentProfile = await fetchCurrentStudentProfile(
+            readStoredStudentProfile() || localStudent || {},
+          );
+
+          if (isMounted) {
+            setBackendStudent(currentProfile || localStudent || null);
+            setBackendLoaded(true);
+          }
+        } catch (error) {
+          if (isMounted) {
+            setBackendError(error?.message || "Student profile could not be loaded.");
+            setBackendStudent(localStudent || null);
+            setBackendLoaded(true);
+          }
+        }
+        return;
+      }
+
       if (!profileUrlId) {
         setBackendLoaded(true);
         return;
@@ -243,19 +292,32 @@ export default function StudentProfile() {
         setBackendLoaded(false);
         setBackendError("");
 
-        const response = await apiClient.get("/admin/users");
-        const users = getArrayPayload(response, ["users", "students", "items", "results", "data"]);
-        const studentUsers = users.filter((user) => {
-          const role = clean(user.role || user.user_role || user.type).toLowerCase();
-          return role.includes("student") || user.student_id || user.student || user.level;
-        });
-        const matchedRawStudent = studentUsers.find((candidate) =>
-          matchesStudentProfileId(candidate, profileUrlId),
-        );
+        let matchedRawStudent = null;
 
-        console.log("STUDENT PROFILE URL PARAM", profileUrlId);
-        console.log("ALL STUDENT USERS", studentUsers);
-        console.log("MATCHED STUDENT", matchedRawStudent);
+        if (session?.role === "faculty") {
+          try {
+            matchedRawStudent = await apiClient.get(
+              `/instructor/students/${encodeURIComponent(profileUrlId)}`,
+            );
+          } catch (error) {
+            if (!stateStudent) {
+              throw error;
+            }
+            matchedRawStudent = stateStudent;
+          }
+        } else {
+          const response = await apiClient.get("/admin/users");
+          const users = getArrayPayload(response, ["users", "students", "items", "results", "data"]);
+          const studentUsers = users.filter((user) => {
+            const role = clean(user.role || user.user_role || user.type).toLowerCase();
+            return role.includes("student") || user.student_id || user.student || user.level;
+          });
+          matchedRawStudent = findStudentForProfile(
+            studentUsers,
+            profileUrlId,
+            profileIdType,
+          );
+        }
 
         if (isMounted) {
           setBackendStudent(matchedRawStudent ? mapBackendStudent(matchedRawStudent, stateStudent || localStudent || {}) : null);
@@ -280,7 +342,7 @@ export default function StudentProfile() {
     return () => {
       isMounted = false;
     };
-  }, [profileUrlId, stateStudent, localStudent]);
+  }, [profileIdType, profileUrlId, stateStudent, localStudent, session?.role]);
 
   useEffect(() => {
     if (selectedStudentId) {
@@ -311,18 +373,19 @@ export default function StudentProfile() {
     email: "Not provided",
     department: "Department not specified",
     level: "Pending",
-    gpa: "0.00",
+    gpa: null,
     status: backendError || "ACTIVE",
   };
-  const gpa = parseNumber(profile.gpa, 0);
-  const attendance = getAttendance(profile);
-  const credits = getCredits(profile);
-  const risk = getRisk(profile);
-  const trend = buildTrend(profile.gpa);
+  const gpa = getEffectiveGpa(profile);
+  const attendance = getAttendance(profile, gpa);
+  const credits = getPassedCreditHours(profile);
+  const risk = getRiskStatus(gpa);
+  const trend = buildTrend(gpa);
   const statusText = profile.status || profile.academicStatus || "ACTIVE";
   const levelText = profile.level || "Pending";
   const departmentText = getDepartmentDisplayName(profile);
   const firstName = profile.name?.split(" ")[0] || "Student";
+  const canManageStudent = session?.role === "admin";
 
   return (
     <main className="student-profile-page">
@@ -343,7 +406,7 @@ export default function StudentProfile() {
               <a href={`mailto:${profile.email || ""}`}>{profile.email || "No email provided"}</a>
             </div>
           </div>
-          <div className="student-profile-actions-wrap">
+          {canManageStudent && <div className="student-profile-actions-wrap">
             <button
               type="button"
               className="student-profile-menu"
@@ -368,7 +431,7 @@ export default function StudentProfile() {
                 </button>
               </div>
             )}
-          </div>
+          </div>}
 
           <div className="student-profile-meta" aria-label="Student summary">
             <div>
@@ -386,7 +449,7 @@ export default function StudentProfile() {
             <div>
               <span>Status</span>
               <strong className={`student-profile-state student-profile-state--${risk.className}`}>
-                {getLearnerStatus(profile)}
+                {risk.label}
               </strong>
             </div>
           </div>
@@ -398,8 +461,8 @@ export default function StudentProfile() {
               <span>Current GPA</span>
               <Star size={15} />
             </div>
-            <strong>{gpa.toFixed(2)}</strong>
-            <small>+0.2 up</small>
+            <strong>{gpa === null ? "-" : gpa.toFixed(2)}</strong>
+            <small>{gpa === null ? "Pending results" : risk.label}</small>
           </article>
           <article>
             <div>
@@ -437,6 +500,7 @@ export default function StudentProfile() {
             </ul>
           </header>
           <div className="student-profile-chart" aria-label="Academic performance trend chart">
+            {trend.length === 0 && <p>No GPA trend is available yet.</p>}
             {trend.map((value, index) => (
               <div className="student-profile-bar" key={`sem-${index + 1}`}>
                 <span style={{ height: `${(value / 4) * 100}%` }} />

@@ -17,15 +17,6 @@ import "./assignInstructor.css";
 
 const PAGE_SIZE = 10;
 
-const getInitials = (name = "") =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(-2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase() || "FM";
-
 const getCourseCode = (course) => {
   if (!course || typeof course !== "object") {
     return String(course || "").split(/\s+-\s+/)[0].trim();
@@ -291,8 +282,8 @@ export default function AssignInstructor() {
         <AdminTopbar />
         <main className="assign-instructor-main">
           <p className="assign-breadcrumb"><span>Faculty Members</span> &gt; <strong>Assign Faculty Member</strong></p>
-          <h1>Select Faculty Member for CS303</h1>
-          <p>Available faculty members for the selected course.</p>
+          <h1>Assign Faculty Member</h1>
+          <p>Select a faculty member, then choose one of the available course offerings.</p>
           {successMessage && <p className="assign-page-status assign-page-status--success" role="status">{successMessage}</p>}
           {loadError && <p className="assign-page-status assign-page-status--error" role="alert">{loadError}</p>}
 

@@ -1,28 +1,13 @@
-export const GRADE_POINTS = {
-  A: 4.0,
-  "A-": 3.7,
-  "B+": 3.3,
-  B: 3.0,
-  "B-": 2.7,
-  "C+": 2.3,
-  C: 2.0,
-  D: 1.0,
-  F: 0,
-};
+import {
+  GRADE_POINTS,
+  calculateWeightedGpaValue,
+  getDeterministicDemoGrade,
+} from "./academicGrades.js";
+
+export { GRADE_POINTS };
 
 export const DEFAULT_ACADEMIC_YEAR = "2025/2026";
 export const DEFAULT_TERMS = ["Fall", "Spring", "Summer"];
-
-const DEMO_GRADES_BY_CODE = {
-  CS101: "A",
-  CS102: "B+",
-  MA101: "B",
-  HUM101: "A-",
-  CS103: "A-",
-  MA105: "B+",
-  ENG101: "A",
-  PHY101: "B",
-};
 
 const cleanText = (value) => value?.toString().trim() || "";
 
@@ -199,29 +184,8 @@ export const getCourseIconKey = (courseCode) => {
 };
 
 export const calculateSemesterGpa = (rows) => {
-  const gradedRows = rows.filter(hasGradedResult);
-
-  if (!gradedRows.length) {
-    return "0.00";
-  }
-
-  const totalCredits = gradedRows.reduce(
-    (total, row) => total + Number(row.credit_hours || row.credits || 0),
-    0,
-  );
-
-  if (!totalCredits) {
-    return "0.00";
-  }
-
-  const totalPoints = gradedRows.reduce((total, row) => {
-    const credits = Number(row.credit_hours || row.credits || 0);
-    const grade = cleanText(row.grade).toUpperCase();
-
-    return total + (GRADE_POINTS[grade] ?? 0) * credits;
-  }, 0);
-
-  return (totalPoints / totalCredits).toFixed(2);
+  const gpa = calculateWeightedGpaValue(rows);
+  return gpa === null ? "-" : gpa.toFixed(2);
 };
 
 export const getAvailableAcademicYears = (rows, studentLevel, currentAcademicYear = getCurrentAcademicYear()) => {
@@ -247,13 +211,7 @@ export const getAvailableTerms = (rows, academicYear) => {
     ),
   ];
 
-  const baseTerms = ["Fall", "Spring"];
-
-  if (termsInYear.includes("Summer")) {
-    baseTerms.push("Summer");
-  }
-
-  return baseTerms;
+  return [...new Set([...DEFAULT_TERMS, ...termsInYear])];
 };
 
 export const filterResultsByPeriod = (rows, academicYear, term, studentLevel, currentAcademicYear) => {
@@ -305,6 +263,7 @@ export const buildTranscriptFromCatalog = ({
   enrolledCourseCodes = [],
   currentAcademicYear = getCurrentAcademicYear(),
   backendResultsByCode = new Map(),
+  studentKey = "learnup-student",
 }) => {
   const enrolledCodes = enrolledCourseCodes.map(cleanCode);
   const rows = [];
@@ -321,16 +280,21 @@ export const buildTranscriptFromCatalog = ({
     const term = getTermFromSemester(semesterId);
     const courseCode = cleanCode(course.course_code);
     const backendEntry = backendResultsByCode.get(courseCode);
-    const status = resolveTranscriptStatus({
+    const resolvedStatus = resolveTranscriptStatus({
       courseLevel,
       studentLevel,
       enrolledCourseCodes: enrolledCodes,
       courseCode,
       backendEntry,
     });
-    const demoGrade = !backendEntry && courseLevel < studentLevel
-      ? DEMO_GRADES_BY_CODE[courseCode]
+    const demoGrade = (
+      !backendEntry &&
+      studentLevel >= 2 &&
+      courseLevel <= studentLevel
+    )
+      ? getDeterministicDemoGrade(studentKey, courseCode, index)
       : undefined;
+    const status = demoGrade ? "passed" : resolvedStatus;
     const grade = backendEntry && hasGradedResult(backendEntry)
       ? cleanText(backendEntry.grade).toUpperCase()
       : demoGrade

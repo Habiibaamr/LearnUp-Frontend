@@ -1,5 +1,5 @@
 import { CANONICAL_COURSE_BY_CODE } from "../data/courseCatalog.js";
-import { mergeCourseBoardCatalog, normalizeOfferingCourse } from "./courseBoard.js";
+import { mergeCourseBoardCatalog } from "./courseBoard.js";
 import {
   buildTranscriptFromCatalog,
   getCurrentAcademicYear,
@@ -11,6 +11,8 @@ import {
   loadLocalEnrolledCourseCodes,
   mergeEnrolledCourseCodes,
 } from "./courseEnrollment.js";
+import { getCurrentSession } from "../utils/learnupRecords.js";
+import { getStudentAcademicKey } from "../utils/academicGrades.js";
 
 const RESULT_ENDPOINTS = [
   "/student/semester-results",
@@ -77,19 +79,16 @@ async function fetchBackendSemesterResults() {
 }
 
 const getEnrolledCourseCodes = async (student) => {
-  let enrollmentRecords = [];
-
   try {
     const coursesResponse = await apiClient.get("/student/me/courses");
-    enrollmentRecords = extractEnrollmentRecords(coursesResponse);
+    const enrollmentRecords = extractEnrollmentRecords(coursesResponse);
+    return mergeEnrolledCourseCodes(
+      enrollmentRecords.map((entry) => cleanCode(entry?.course_code || entry?.code)),
+      loadLocalEnrolledCourseCodes(student),
+    );
   } catch {
-    enrollmentRecords = [];
+    return mergeEnrolledCourseCodes([], loadLocalEnrolledCourseCodes(student));
   }
-
-  return mergeEnrolledCourseCodes(
-    enrollmentRecords.map((entry) => cleanCode(entry?.course_code || entry?.code)),
-    loadLocalEnrolledCourseCodes(student),
-  );
 };
 
 const mapBackendResultsByCode = (backendRows) => {
@@ -102,7 +101,7 @@ const mapBackendResultsByCode = (backendRows) => {
   return byCode;
 };
 
-const hasCompleteBackendTranscript = (backendRows, studentLevel) => {
+const hasCompleteBackendTranscript = (backendRows) => {
   if (!backendRows.length) {
     return false;
   }
@@ -117,19 +116,24 @@ export async function fetchStudentSemesterResults(student = null) {
     1;
   const currentAcademicYear = getCurrentAcademicYear();
   const catalog = mergeCourseBoardCatalog([]);
-  const enrolledCourseCodes = await getEnrolledCourseCodes(student);
+  const isDemoSession = getCurrentSession()?.isDemoSession;
+  const enrolledCourseCodes = isDemoSession
+    ? loadLocalEnrolledCourseCodes(student)
+    : await getEnrolledCourseCodes(student);
 
   let backendRows = [];
 
-  try {
-    backendRows = await fetchBackendSemesterResults();
-  } catch (error) {
-    if (error?.status === 401) {
-      throw error;
+  if (!isDemoSession) {
+    try {
+      backendRows = await fetchBackendSemesterResults();
+    } catch (error) {
+      if (error?.status === 401) {
+        throw error;
+      }
     }
   }
 
-  if (hasCompleteBackendTranscript(backendRows, studentLevel)) {
+  if (hasCompleteBackendTranscript(backendRows)) {
     return backendRows;
   }
 
@@ -141,6 +145,7 @@ export async function fetchStudentSemesterResults(student = null) {
     enrolledCourseCodes,
     currentAcademicYear,
     backendResultsByCode,
+    studentKey: getStudentAcademicKey(student),
   });
 }
 

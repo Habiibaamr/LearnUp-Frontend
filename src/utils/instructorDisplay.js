@@ -19,7 +19,12 @@ export {
 const DEMO_EMAIL_PATTERN = /^user\d+@learnup\.edu$/i;
 const DEMO_NAME_PATTERN = /^User\s+\d+\s+Full\s+Name$/i;
 const DEMO_UNIVERSITY_ID_PATTERN = /^U\d+$/i;
-const DEFAULT_FACULTY_NAME = "Engineering & Technology";
+const FACULTY_NAMES_BY_ID = {
+  1: "Faculty of Artificial Intelligence",
+  2: "Faculty of Computer Science",
+  3: "Faculty of Engineering & Technology",
+  4: "Faculty of Information Systems",
+};
 
 export const cleanText = (value) => {
   if (value === undefined || value === null || typeof value === "object") {
@@ -86,7 +91,15 @@ export function getFacultyDisplayName(item) {
     user.faculty_name ||
     user.facultyName;
 
-  return cleanDisplayValue(faculty) || DEFAULT_FACULTY_NAME;
+  const facultyId = Number(
+    source.faculty_id ||
+    item?.faculty_id ||
+    user.faculty_id ||
+    source.facultyId ||
+    item?.facultyId,
+  );
+
+  return cleanDisplayValue(faculty) || FACULTY_NAMES_BY_ID[facultyId] || "Faculty not specified";
 }
 
 const toBoolean = (value) => {

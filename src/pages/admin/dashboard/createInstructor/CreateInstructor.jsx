@@ -6,6 +6,7 @@ import AdminTopbar from "../../../../components/admin/AdminTopbar.jsx";
 import {
   createInstructorAccount,
   deleteInstructorAccount,
+  FACULTY_OPTIONS,
   isMissingEndpointError,
   listInstructors,
   mapBackendInstructor,
@@ -23,12 +24,20 @@ import { DEPARTMENT_OPTIONS } from "../../../../utils/departments.js";
 import "./createInstructor.css";
 
 const departments = DEPARTMENT_OPTIONS;
-const faculties = ["Engineering & Technology"];
 const genderOptions = ["Male", "Female"];
 const titleOptions = ["Teaching Assistant", "Assistant Lecturer", "Lecturer", "Senior Lecturer", "Professor"];
 const roleOptions = ["Faculty Member", "Course Instructor", "Academic Advisor", "Department Coordinator"];
 const statusOptions = ["AVAILABLE", "ACTIVE", "FULL"];
 const PAGE_SIZE = 10;
+
+const getNumericId = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
+    const numeric = Number(value);
+    if (Number.isInteger(numeric) && numeric > 0) return numeric;
+  }
+  return null;
+};
 
 const getInitialInstructorForm = () => ({
   fullName: "",
@@ -39,7 +48,7 @@ const getInitialInstructorForm = () => ({
   initialPassword: "",
   facultyId: generateFacultyId(),
   department: "Artificial Intelligence",
-  faculty: "Engineering & Technology",
+  faculty: FACULTY_OPTIONS[0].label,
   title: "Lecturer",
   role: "Faculty Member",
   specialization: "",
@@ -49,7 +58,14 @@ const getInitialInstructorForm = () => ({
 });
 
 const getInstructorBackendId = (instructor) =>
-  instructor?.backendInstructorId || instructor?.instructor_id || instructor?.instructorIdNumeric || instructor?.id;
+  getNumericId(
+    instructor?.backendInstructorId,
+    instructor?.instructor_id,
+    instructor?.instructorIdNumeric,
+    instructor?.backendRecord?.instructor?.instructor_id,
+    instructor?.backendRecord?.instructor_id,
+    instructor?.backendRecord?.id,
+  );
 
 const instructorToForm = (instructor) => ({
   ...getInitialInstructorForm(),
@@ -61,7 +77,10 @@ const instructorToForm = (instructor) => ({
   initialPassword: "",
   facultyId: instructor?.facultyId || instructor?.id || generateFacultyId(),
   department: instructor?.department || "Artificial Intelligence",
-  faculty: instructor?.faculty || "Engineering & Technology",
+  faculty:
+    FACULTY_OPTIONS.find((option) => option.id === Number(instructor?.faculty_id))?.label ||
+    instructor?.faculty ||
+    FACULTY_OPTIONS[0].label,
   title: instructor?.title || instructor?.academicPosition || "Lecturer",
   role: instructor?.role || "Faculty Member",
   specialization: instructor?.specialization || "",
@@ -190,7 +209,9 @@ function InstructorModal({ errorMessage, initialForm, isEditMode = false, isSubm
             <label>
               Faculty / College
               <select name="faculty" value={form.faculty} onChange={handleChange}>
-                {faculties.map((faculty) => <option key={faculty}>{faculty}</option>)}
+                {FACULTY_OPTIONS.map((faculty) => (
+                  <option key={faculty.id} value={faculty.label}>{faculty.label}</option>
+                ))}
               </select>
             </label>
             <label>
@@ -341,19 +362,29 @@ export default function CreateInstructor({ initialModalOpen = false }) {
   }, [totalPages]);
 
   const openInstructorProfile = (instructor) => {
-    const profileId =
-      instructor.backendInstructorId ||
-      instructor.instructor_id ||
-      instructor.instructorId ||
-      instructor.universityId ||
-      instructor.id;
+    const instructorId = getNumericId(
+      instructor.backendInstructorId,
+      instructor.instructor_id,
+      instructor.backendRecord?.instructor?.instructor_id,
+      instructor.backendRecord?.instructor?.id,
+      instructor.backendRecord?.instructor_id,
+    );
+    const userId = getNumericId(
+      instructor.user_id,
+      instructor.userId,
+      instructor.backendRecord?.user?.id,
+      instructor.backendRecord?.user_id,
+    );
+    const profileId = instructorId || userId || instructor.universityId || instructor.id;
 
     setSelectedFacultyId(instructor.id);
     navigate(`/admin/faculty/profile/${encodeRecordId(profileId)}`, {
       state: {
         facultyId: instructor.id,
         facultyMember: instructor,
-        instructorId: instructor.backendInstructorId || instructor.instructor_id || instructor.instructorId,
+        instructorId,
+        userId,
+        profileIdType: instructorId ? "instructor_id" : userId ? "user_id" : "university_id",
       },
     });
   };
@@ -495,7 +526,7 @@ export default function CreateInstructor({ initialModalOpen = false }) {
               <tbody>
                 {paginatedInstructors.map((instructor) => (
                     <tr
-                      key={instructor.id}
+                      key={instructor.backendInstructorId || instructor.user_id || instructor.id}
                       onClick={() => openInstructorProfile(instructor)}
                       className="instructor-table-row"
                     >

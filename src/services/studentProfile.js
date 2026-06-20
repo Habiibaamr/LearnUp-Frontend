@@ -12,6 +12,7 @@ export { getStudentLevelLabel, getStudentNumericLevel, getStudentTopbarLevelLabe
 export const CURRENT_STUDENT_STORAGE_KEY = "learnup_current_user";
 
 const STUDENT_PROFILE_ENDPOINTS = [
+  "/student/me",
   "/student/v2/me/card",
   "/student/me/card",
   "/learnup/student/identity-card",

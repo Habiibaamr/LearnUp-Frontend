@@ -2,6 +2,7 @@ import {
   Bot,
   Grid2X2,
   GraduationCap,
+  ListChecks,
   LayoutDashboard,
   LogOut,
   ScrollText,
@@ -15,6 +16,7 @@ const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/student/dashboard" },
   { label: "Course board", icon: ScrollText, to: "/student/course-board" },
   { label: "Academic map", icon: GraduationCap, to: "/student/academic-map" },
+  { label: "Degree audit", icon: ListChecks, to: "/student/degree-audit" },
   { label: "Semester result", icon: Grid2X2, to: "/student/semester-result" },
 ];
 

@@ -24,6 +24,12 @@ import {
   persistStudentProfile,
   readStoredStudentProfile,
 } from "../../../services/studentProfile.js";
+import { getCurrentSession } from "../../../utils/learnupRecords.js";
+import {
+  getEffectiveGpa,
+  getPassedCreditHours,
+  getRiskStatus,
+} from "../../../utils/studentAcademic.js";
 import "./studentDashboard.css";
 
 // Mock course-board preview rows stay in place until student course-board data is wired.
@@ -117,8 +123,6 @@ const getStudentValue = (record, keys) => {
   return "";
 };
 
-const DEMO_ADVISOR_NAME = "Dr. Amira Mohamed";
-
 const getStudentEmail = (record) => getStudentValue(record, ["email", "user.email"]) || "";
 const getStudentId = (record) => getStudentValue(record, ["university_id", "student_id", "id", "user.university_id", "user.student_id"]) || "";
 const getStudentAdvisor = (record) => {
@@ -128,8 +132,18 @@ const getStudentAdvisor = (record) => {
     "advisorName",
     "advisor",
   ]);
+  const advisorId = getStudentValue(record, ["advisor_instructor_id", "advisorInstructorId"]);
+  const normalizedValue = String(value || "").trim().toLowerCase();
 
-  return value || DEMO_ADVISOR_NAME;
+  if (value && !/(pending|not assigned|unassigned|none)/.test(normalizedValue)) {
+    return typeof value === "object"
+      ? value.full_name || value.name || "Academic advisor assigned"
+      : value;
+  }
+
+  return advisorId
+    ? `Academic advisor assigned (ID ${advisorId})`
+    : "Academic advisor not assigned";
 };
 
 export default function StudentDashboard() {
@@ -152,13 +166,25 @@ export default function StudentDashboard() {
   const studentDepartment = getStudentDepartmentLabel(currentStudent);
   const studentLevel = getStudentLevelLabel(currentStudent);
   const studentAdvisor = getStudentAdvisor(currentStudent);
+  const creditsEarned = getPassedCreditHours(currentStudent || {});
+  const currentGpa = getEffectiveGpa(currentStudent || {});
+  const riskStatus = getRiskStatus(currentStudent || {});
+  const completionPercent = Math.min(100, Math.round((creditsEarned / 120) * 100));
+  const remainingCredits = Math.max(0, 120 - creditsEarned);
 
   useEffect(() => {
     const token = getStorageItem(ACCESS_TOKEN_STORAGE_KEY);
+    const session = getCurrentSession();
 
-    if (!token) {
+    if (!token && !session?.isDemoSession) {
       persistStudentProfile(null);
       navigate("/login", { replace: true });
+      return;
+    }
+
+    if (session?.isDemoSession) {
+      setCurrentStudent(readStoredStudentProfile());
+      setLoadingStudent(false);
       return;
     }
 
@@ -263,31 +289,33 @@ export default function StudentDashboard() {
                   <h2>Academic Progress</h2>
                 </div>
                 <div className="student-progress-card-v2__percent">
-                  <strong>75%</strong>
+                  <strong>{completionPercent}%</strong>
                   <small>OF DEGREE COMPLETED</small>
                 </div>
               </div>
 
-              <div className="student-progress-card-v2__bar"><span /></div>
+              <div className="student-progress-card-v2__bar">
+                <span style={{ width: `${completionPercent}%` }} />
+              </div>
 
               <div className="student-progress-card-v2__stats">
                 <div>
                   <span>Credits Earned</span>
-                  <strong>90/120</strong>
+                  <strong>{creditsEarned}/120</strong>
                 </div>
                 <div>
                   <span>Current GPA</span>
-                  <strong>3.82</strong>
+                  <strong>{currentGpa === null ? "-" : currentGpa.toFixed(2)}</strong>
                 </div>
                 <div className="is-highlighted">
                   <span>Remaining</span>
-                  <strong>30 Credits hours</strong>
+                  <strong>{remainingCredits} Credit hours</strong>
                 </div>
               </div>
 
               <div className="student-progress-card-v2__foot">
-                <p>Estimated Graduation: <strong>June 2026</strong></p>
-                <button type="button">
+                <p>Academic Status: <strong>{riskStatus.label}</strong></p>
+                <button type="button" onClick={() => navigate("/student/degree-audit")}>
                   View Detailed Audit <ChevronRight size={16} />
                 </button>
               </div>

@@ -1,4 +1,13 @@
 import { apiClient } from "./apiClient.js";
+import {
+  CANONICAL_COURSE_BY_CODE,
+  CANONICAL_COURSE_CATALOG,
+} from "../data/courseCatalog.js";
+import { getEffectiveGpa, getRiskStatus } from "../utils/studentAcademic.js";
+import {
+  getCurrentSession,
+  resolveFacultyForSession,
+} from "../utils/learnupRecords.js";
 
 const ENDPOINT_NOT_AVAILABLE = new Set([404, 405]);
 
@@ -21,6 +30,10 @@ const cleanText = (value) => (
 );
 
 const toNumberOrNull = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 };
@@ -80,22 +93,6 @@ export const formatFacultyCourseLevel = (course) => {
   return level ? `Level ${level}` : "Level not available";
 };
 
-const getAcademicStatus = (cgpa, accountStatus) => {
-  const numericCgpa = toNumberOrNull(cgpa);
-
-  if (numericCgpa !== null) {
-    if (numericCgpa < 2.5) {
-      return "AT RISK";
-    }
-    if (numericCgpa >= 3.5) {
-      return "EXCELLENT";
-    }
-    return "NORMAL";
-  }
-
-  return cleanText(accountStatus).toUpperCase() || "ACTIVE";
-};
-
 export const normalizeFacultyProfile = (profile = {}) => ({
   instructor_id: toNumberOrNull(profile.instructor_id ?? profile.instructorId ?? profile.id),
   user_id: toNumberOrNull(profile.user_id ?? profile.userId),
@@ -117,7 +114,6 @@ export const normalizeFacultyProfile = (profile = {}) => ({
 });
 
 export const normalizeFacultyStudent = (student = {}, index = 0) => {
-  const cgpa = toNumberOrNull(student.cgpa ?? student.gpa);
   const level = toNumberOrNull(student.level);
   const universityId = cleanText(
     student.university_id ??
@@ -127,7 +123,8 @@ export const normalizeFacultyStudent = (student = {}, index = 0) => {
     student.id,
   );
 
-  return {
+  const normalizedStudent = {
+    ...student,
     student_id: toNumberOrNull(student.student_id ?? student.id),
     user_id: toNumberOrNull(student.user_id ?? student.userId),
     university_id: universityId,
@@ -141,16 +138,24 @@ export const normalizeFacultyStudent = (student = {}, index = 0) => {
     ) || "Not specified",
     level,
     level_label: level ? `Level ${level}` : "Not specified",
-    cgpa,
-    gpa_label: cgpa === null ? "—" : cgpa.toFixed(2),
     status: cleanText(student.status) || "active",
-    academic_status: getAcademicStatus(cgpa, student.status),
     relationship_type: cleanText(student.relationship_type) || "course_student",
     relationship_label:
       cleanText(student.relationship_type) === "advisor"
         ? "Academic advisee"
         : "Course student",
     avatar: ["sarah", "alex", "james"][index % 3],
+  };
+  const cgpa = getEffectiveGpa(normalizedStudent);
+  const risk = getRiskStatus(cgpa);
+
+  return {
+    ...normalizedStudent,
+    cgpa,
+    gpa_label: cgpa === null ? "-" : cgpa.toFixed(2),
+    academic_status: risk.label.toUpperCase(),
+    academic_status_label: risk.label,
+    risk_class: risk.className,
   };
 };
 
@@ -166,10 +171,14 @@ const getCourseTerm = (course, semesterId) => {
 };
 
 export const normalizeFacultyCourse = (course = {}, index = 0) => {
-  const semesterId = toNumberOrNull(
+  const backendCourseCode = cleanText(
+    course.course_code ?? course.code ?? course.course?.course_code,
+  ).toUpperCase();
+  const canonical = CANONICAL_COURSE_BY_CODE.get(backendCourseCode);
+  const semesterId = canonical?.semester_id ?? toNumberOrNull(
     course.semester_id ?? course.semester_number ?? course.semesterNumber,
   );
-  const level = getFacultyCourseLevel(course);
+  const level = canonical?.level ?? getFacultyCourseLevel({ ...course, semester_id: semesterId });
   const status = cleanText(course.status ?? course.offering_status) || "open";
 
   return {
@@ -178,13 +187,11 @@ export const normalizeFacultyCourse = (course = {}, index = 0) => {
       course.course_offering_id ?? course.offering_id ?? course.id,
     ),
     course_id: toNumberOrNull(course.course_id ?? course.course?.id),
-    course_code: cleanText(
-      course.course_code ?? course.code ?? course.course?.course_code,
-    ) || `COURSE-${index + 1}`,
-    course_title: cleanText(
+    course_code: canonical?.course_code || backendCourseCode || `COURSE-${index + 1}`,
+    course_title: canonical?.course_title || cleanText(
       course.course_title ?? course.title ?? course.name ?? course.course?.title,
     ) || "Course",
-    credit_hours: toNumberOrNull(course.credit_hours ?? course.credits),
+    credit_hours: canonical?.credit_hours ?? toNumberOrNull(course.credit_hours ?? course.credits),
     semester_id: semesterId,
     semester_name: cleanText(course.semester_name) || (
       semesterId ? `Semester ${semesterId}` : "Semester not available"
@@ -202,10 +209,17 @@ export const normalizeFacultyCourse = (course = {}, index = 0) => {
     enrolled_students_count: toNumberOrNull(
       course.enrolled_students_count ?? course.students_count ?? course.students,
     ) ?? 0,
+    catalog_order: canonical
+      ? CANONICAL_COURSE_CATALOG.findIndex((entry) => entry.course_code === canonical.course_code)
+      : Number.MAX_SAFE_INTEGER,
   };
 };
 
 const compareFacultyCourses = (firstCourse, secondCourse) => {
+  if (firstCourse.catalog_order !== secondCourse.catalog_order) {
+    return firstCourse.catalog_order - secondCourse.catalog_order;
+  }
+
   const firstSemester = firstCourse.semester_id ?? Number.MAX_SAFE_INTEGER;
   const secondSemester = secondCourse.semester_id ?? Number.MAX_SAFE_INTEGER;
 
@@ -266,6 +280,17 @@ const FALLBACK_ENROLLMENT_STUDENTS = [
 ];
 
 export async function fetchFacultyProfile() {
+  const session = getCurrentSession();
+
+  if (session?.isDemoSession) {
+    return normalizeFacultyProfile(
+      resolveFacultyForSession(session.email) || {
+        full_name: session.name,
+        email: session.email,
+      },
+    );
+  }
+
   try {
     const response = await requestFirstAvailable([
       "/faculty/me",
@@ -283,6 +308,10 @@ export async function fetchFacultyProfile() {
 }
 
 export async function fetchFacultyCourses() {
+  if (getCurrentSession()?.isDemoSession) {
+    return [];
+  }
+
   let response;
 
   try {
@@ -332,6 +361,10 @@ async function fetchStudentsFromAssignedOfferings() {
 }
 
 export async function fetchFacultyStudents() {
+  if (getCurrentSession()?.isDemoSession) {
+    return [];
+  }
+
   try {
     const response = await apiClient.get("/faculty/my-students");
     return getArrayPayload(response, ["students", "items", "data"])

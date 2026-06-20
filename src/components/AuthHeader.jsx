@@ -1,21 +1,15 @@
-import logo from "../assets/logo.png";
+import { Link } from "react-router-dom";
+import logo from "../assets/learnup-logo.png";
 import "./authHeader.css";
-
-const logoIncludesText = false;
 
 export default function AuthHeader() {
   return (
     <div className="auth-header">
-      <div className="auth-header-left">
+      <Link to="/" className="auth-header-left" aria-label="LearnUp home">
         <div className="auth-logo-box">
           <img src={logo} alt="LearnUp" className="auth-logo" />
         </div>
-        {!logoIncludesText && <span className="auth-title">LearnUp</span>}
-      </div>
-
-      <div className="auth-header-right">
-        <div className="auth-avatar" />
-      </div>
+      </Link>
     </div>
   );
 }

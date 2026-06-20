@@ -113,11 +113,15 @@
 
 .academic-roadmap-column__cards {
   display: grid;
+  grid-auto-rows: 1fr;
   gap: 18px;
 }
 
 .academic-map-card {
   position: relative;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
   min-height: 132px;
   padding: 19px 18px;
   border-left: 4px solid #e5e7eb;
@@ -184,6 +188,7 @@
 }
 
 .academic-map-card p {
+  margin-bottom: 0;
   margin-top: 8px;
   color: #4b5563;
   font-size: 14px;

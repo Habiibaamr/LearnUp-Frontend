@@ -36,7 +36,7 @@ const checks = [
   ["Sem1 passed not in progress", fall2024.every((r) => r.status === "passed")],
   ["Sem2 in 2024/2025 Spring", codes(spring2024).join(",") === "CS103,ENG101,MA105,PHY101"],
   ["Sem3 in 2025/2026 Fall", codes(fall2025).join(",") === "CS201,CS202,MA201,STAT201"],
-  ["CS201 in progress when enrolled", fall2025.find((r) => r.course_code === "CS201")?.status === "in progress"],
+  ["2025/2026 Fall results are published", fall2025.every((r) => r.status === "passed" && r.grade !== "-")],
   ["CS101 not in 2025/2026 Fall", !codes(fall2025).includes("CS101")],
   ["Sem4 in 2025/2026 Spring", codes(spring2025).join(",") === "CS203,CS204,CS205,SE201"],
   ["Registered credits Fall 2025", fall2025.reduce((t, r) => t + r.credit_hours, 0) === 13],

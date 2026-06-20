@@ -9,6 +9,7 @@ import {
   persistStudentProfile,
   readStoredStudentProfile,
 } from "../../services/studentProfile.js";
+import { getCurrentSession } from "../../utils/learnupRecords.js";
 import "./studentShell.css";
 
 const getStorageItem = (key) => {
@@ -33,9 +34,15 @@ export default function StudentTopbar({ dashboardTabs = false }) {
 
   useEffect(() => {
     const token = getStorageItem(ACCESS_TOKEN_STORAGE_KEY);
+    const session = getCurrentSession();
 
-    if (!token) {
+    if (!token && !session?.isDemoSession) {
       navigate("/login", { replace: true });
+      return;
+    }
+
+    if (session?.isDemoSession) {
+      setCurrentStudent(readStoredStudentProfile());
       return;
     }
 
@@ -92,9 +99,13 @@ export default function StudentTopbar({ dashboardTabs = false }) {
       {dashboardTabs && (
         <nav className="student-topbar-v2__tabs" aria-label="Dashboard sections">
           <button type="button" className="is-active">Term Overview</button>
-          <button type="button">Degree Audit</button>
-          <button type="button">Course Catalog</button>
-          <button type="button" className="student-topbar-v2__chat-tab">
+          <button type="button" onClick={() => navigate("/student/degree-audit")}>Degree Audit</button>
+          <button type="button" onClick={() => navigate("/student/course-board")}>Course Catalog</button>
+          <button
+            type="button"
+            className="student-topbar-v2__chat-tab"
+            onClick={() => navigate("/student/academic-advisor-bot")}
+          >
             <MessageSquare size={14} strokeWidth={2.4} />
             <span>Chatbot Support</span>
           </button>

@@ -12,11 +12,12 @@ export default function StudentCreated() {
   const navigate = useNavigate();
   const { studentId } = useParams();
   const { state } = useLocation();
+  const hasRequestedStudent = Boolean(studentId || state?.studentId);
   const student =
     state?.createdStudent ||
     findStudentById(studentId) ||
     findStudentById(state?.studentId) ||
-    getLastCreatedStudent();
+    (!hasRequestedStudent ? getLastCreatedStudent() : null);
 
   const handleViewProfile = () => {
     if (!student) {

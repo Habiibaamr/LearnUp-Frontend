@@ -89,24 +89,24 @@ const getInstructorUniversityId = (record) => {
   return "";
 };
 
-const getInstructorNumericValue = (record, keys) => {
-  for (const source of getInstructorSources(record)) {
-    for (const key of keys) {
-      const numericValue = toNumberId(source?.[key]);
+const getInstructorBackendId = (record) =>
+  toNumberId(
+    record?.instructor?.instructor_id ??
+    record?.instructor?.id ??
+    record?.instructor_id ??
+    record?.backendInstructorId,
+  );
 
-      if (numericValue !== null) {
-        return numericValue;
-      }
-    }
-  }
+const getInstructorUserId = (record) =>
+  toNumberId(
+    record?.user?.user_id ??
+    record?.user?.id ??
+    record?.user_id ??
+    record?.userId ??
+    record?.instructor?.user_id,
+  );
 
-  return null;
-};
-
-const getResolvedInstructorId = (instructor) =>
-  getInstructorNumericValue(instructor, ["instructor_id", "id"]);
-
-const matchesInstructorProfileId = (instructor, profileId) => {
+const matchesInstructorProfileId = (instructor, profileId, profileIdType = "") => {
   const normalizedProfileId = normalizeId(profileId);
   const numericProfileId = toNumberId(profileId);
 
@@ -114,7 +114,10 @@ const matchesInstructorProfileId = (instructor, profileId) => {
     return false;
   }
 
-  if (normalizeId(getInstructorUniversityId(instructor)) === normalizedProfileId) {
+  if (
+    (!profileIdType || profileIdType === "university_id") &&
+    normalizeId(getInstructorUniversityId(instructor)) === normalizedProfileId
+  ) {
     return true;
   }
 
@@ -122,9 +125,44 @@ const matchesInstructorProfileId = (instructor, profileId) => {
     return false;
   }
 
-  return ["instructor_id", "id", "user_id"].some(
-    (key) => getInstructorNumericValue(instructor, [key]) === numericProfileId,
+  if (profileIdType === "instructor_id") {
+    return getInstructorBackendId(instructor) === numericProfileId;
+  }
+
+  if (profileIdType === "user_id") {
+    return getInstructorUserId(instructor) === numericProfileId;
+  }
+
+  return (
+    getInstructorBackendId(instructor) === numericProfileId ||
+    getInstructorUserId(instructor) === numericProfileId
   );
+};
+
+const findInstructorForProfile = (instructors, profileId, profileIdType = "") => {
+  if (profileIdType) {
+    return instructors.find((instructor) =>
+      matchesInstructorProfileId(instructor, profileId, profileIdType),
+    ) || null;
+  }
+
+  const numericProfileId = toNumberId(profileId);
+
+  if (numericProfileId !== null) {
+    const instructorIdMatch = instructors.find(
+      (instructor) => getInstructorBackendId(instructor) === numericProfileId,
+    );
+    if (instructorIdMatch) return instructorIdMatch;
+
+    const userIdMatch = instructors.find(
+      (instructor) => getInstructorUserId(instructor) === numericProfileId,
+    );
+    if (userIdMatch) return userIdMatch;
+  }
+
+  return instructors.find((instructor) =>
+    normalizeId(getInstructorUniversityId(instructor)) === normalizeId(profileId),
+  ) || null;
 };
 
 const getStateFaculty = (state) =>
@@ -463,6 +501,7 @@ export default function FacultyProfile() {
   const { state } = useLocation();
   const session = getCurrentSession();
   const stateFaculty = getStateFaculty(state);
+  const profileIdType = clean(state?.profileIdType);
   const profileUrlId = getProfileLookupId(facultyId, stateFaculty, state);
   const localFaculty = useMemo(() => {
     if (profileUrlId) {
@@ -522,8 +561,10 @@ export default function FacultyProfile() {
         const profileId = getProfileIdForLookup(profileUrlId, stateFaculty, localFaculty);
         const response = await apiClient.get("/admin/instructors");
         const instructors = getArrayPayload(response, ["instructors", "faculty", "items", "results", "data"]);
-        const matchedRawInstructor = instructors.find((instructor) =>
-          matchesInstructorProfileId(instructor, profileId),
+        const matchedRawInstructor = findInstructorForProfile(
+          instructors,
+          profileId,
+          profileIdType,
         );
         const matchedInstructor = matchedRawInstructor
           ? mapBackendInstructor(matchedRawInstructor, stateFaculty || localFaculty || {})
@@ -532,6 +573,22 @@ export default function FacultyProfile() {
         console.log("PROFILE URL PARAM", profileId);
         console.log("ALL INSTRUCTORS", instructors);
         console.log("MATCHED INSTRUCTOR", matchedInstructor);
+
+        if (!matchedInstructor && stateFaculty) {
+          let assignedCourses = [];
+
+          try {
+            assignedCourses = await loadAssignedCoursesForProfile(stateFaculty);
+          } catch {
+            assignedCourses = getFacultyCourses(stateFaculty);
+          }
+
+          if (isMounted) {
+            setBackendFaculty(applyProfileAssignments(stateFaculty, assignedCourses));
+            setBackendLoaded(true);
+          }
+          return;
+        }
 
         if (!matchedInstructor) {
           console.error("No instructor matched profile id", profileId, instructors);
@@ -597,7 +654,7 @@ export default function FacultyProfile() {
     return () => {
       isMounted = false;
     };
-  }, [localFaculty, navigate, profileUrlId, session?.role, stateFaculty]);
+  }, [localFaculty, navigate, profileIdType, profileUrlId, session?.role, stateFaculty]);
 
   useEffect(() => {
     if (selectedFacultyId) {
@@ -684,6 +741,7 @@ export default function FacultyProfile() {
     clean(faculty.universityId || faculty.university_id || faculty.id || faculty.facultyId || faculty.instructorId) ||
     "Pending";
   const academicPosition = clean(faculty.title || faculty.academicPosition || faculty.position || faculty.role) || "Faculty Member";
+  const facultyRole = clean(faculty.role || faculty.academic_position || academicPosition) || "Faculty Member";
   const department = getDepartmentDisplayName(faculty);
   const facultyNameValue = getFacultyDisplayName(faculty);
   const specialization = clean(faculty.specialization) || "Specialization pending";
@@ -751,6 +809,10 @@ export default function FacultyProfile() {
             <div>
               <span>Academic Position</span>
               <strong>{academicPosition}</strong>
+            </div>
+            <div>
+              <span>Role</span>
+              <strong>{facultyRole}</strong>
             </div>
             <div>
               <span>Department</span>

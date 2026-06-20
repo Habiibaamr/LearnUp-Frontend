@@ -13,11 +13,12 @@ export default function InstructorSuccessPage() {
   const navigate = useNavigate();
   const { facultyId } = useParams();
   const { state } = useLocation();
+  const hasRequestedFaculty = Boolean(facultyId || state?.facultyId || state?.instructorId);
   const faculty =
     state?.facultyMember ||
     findFacultyById(facultyId) ||
     findFacultyById(state?.facultyId) ||
-    getLastCreatedFaculty();
+    (!hasRequestedFaculty ? getLastCreatedFaculty() : null);
 
   const handleViewProfile = () => {
     if (!faculty) {
