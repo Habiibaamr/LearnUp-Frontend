@@ -20,16 +20,23 @@ import {
 } from "../../../services/chatbot.js";
 import "./academicAdvisorBot.css";
 
-const chips = ["When is my next quiz?", "Explain K-means clustering", "Show my grades", "Help with Calculus"];
+const chips = [
+  "Explain registration rules",
+  "How can I improve my academic performance?",
+  "What should I do if I am struggling in a course?",
+  "Explain grade posting policies",
+  "Give me study tips for this semester",
+  "Explain K-means clustering",
+];
 const AI_NOT_CONFIGURED_MESSAGE =
-  "I can help with academic advising, but the AI service is not configured yet. Please contact your academic advisor.";
+  "Learnbot is currently unavailable. Please try again later.";
 
 const initialMessages = [
   {
     id: "welcome",
     sender: "bot",
     meta: "Learnbot",
-    text: "Hello! I can help with courses, academic planning, grades, and study questions. What would you like to work on?",
+    text: "Hello! I can help with academic advising, registration rules, policies, and study guidance. What would you like to know?",
   },
 ];
 
@@ -99,15 +106,23 @@ export default function AcademicAdvisorBot() {
     };
   }, []);
 
+  const sessionsWithLabels = useMemo(
+    () => sessions.map((session, index) => ({
+      ...session,
+      displayLabel: `Chat ${index + 1}`,
+    })),
+    [sessions],
+  );
+
   const filteredSessions = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return sessions.filter((session) => (
+    return sessionsWithLabels.filter((session) => (
       !query ||
-      `chat ${session.session_id}`.includes(query) ||
+      session.displayLabel.toLowerCase().includes(query) ||
       String(session.started_at || "").toLowerCase().includes(query)
     ));
-  }, [search, sessions]);
+  }, [search, sessionsWithLabels]);
 
   const openSession = async (sessionId) => {
     try {
@@ -181,7 +196,7 @@ export default function AcademicAdvisorBot() {
           text: AI_NOT_CONFIGURED_MESSAGE,
         },
       ]);
-      setChatError("Learnbot is temporarily unavailable. Your other LearnUp pages will continue to work.");
+      setChatError("Learnbot is currently unavailable. Please try again later.");
     } finally {
       setLoadingReply(false);
     }
@@ -222,7 +237,7 @@ export default function AcademicAdvisorBot() {
                 className={activeSessionId === session.session_id ? "is-active" : ""}
                 onClick={() => openSession(session.session_id)}
               >
-                <strong>Chat {session.session_id}</strong>
+                <strong>{session.displayLabel}</strong>
                 <span>{session.started_at ? new Date(session.started_at).toLocaleDateString() : "Recent"}</span>
               </button>
             ))}
