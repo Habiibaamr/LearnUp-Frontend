@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Image,
@@ -72,6 +72,13 @@ export default function AcademicAdvisorBot() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [loadingReply, setLoadingReply] = useState(false);
   const [chatError, setChatError] = useState("");
+  const messagesContainerRef = useRef(null);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  }, [messages, loadingReply]);
 
   useEffect(() => {
     let isMounted = true;
@@ -278,7 +285,7 @@ export default function AcademicAdvisorBot() {
           ))}
         </div>
 
-        <main className="advisor-chat__messages">
+        <main className="advisor-chat__messages" ref={messagesContainerRef}>
           {messages.map((message) => <Message key={message.id} message={message} />)}
           {loadingReply && (
             <div className="advisor-typing">
@@ -288,30 +295,32 @@ export default function AcademicAdvisorBot() {
           )}
         </main>
 
-        {chatError && <p className="advisor-disclaimer" role="status">{chatError}</p>}
+        <div className="advisor-chat__footer">
+          {chatError && <p className="advisor-disclaimer advisor-disclaimer--error" role="status">{chatError}</p>}
 
-        <form className="advisor-composer" onSubmit={handleSubmit}>
-          <div>
-            <input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="Type your question here..."
-            />
-            <footer>
-              <span>
-                <button type="button" aria-label="Attach file"><Paperclip size={15} /></button>
-                <button type="button" aria-label="Attach image"><Image size={15} /></button>
-                <button type="button" aria-label="Use microphone"><Mic size={15} /></button>
-              </span>
-              <small>Press Enter to send</small>
-            </footer>
-          </div>
-          <button type="submit" aria-label="Send" disabled={loadingReply}>
-            <SendHorizontal size={23} />
-          </button>
-        </form>
+          <form className="advisor-composer" onSubmit={handleSubmit}>
+            <div>
+              <input
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder="Type your question here..."
+              />
+              <footer>
+                <span>
+                  <button type="button" aria-label="Attach file"><Paperclip size={15} /></button>
+                  <button type="button" aria-label="Attach image"><Image size={15} /></button>
+                  <button type="button" aria-label="Use microphone"><Mic size={15} /></button>
+                </span>
+                <small>Press Enter to send</small>
+              </footer>
+            </div>
+            <button type="submit" aria-label="Send" disabled={loadingReply}>
+              <SendHorizontal size={23} />
+            </button>
+          </form>
 
-        <p className="advisor-disclaimer">Learnbot AI may occasionally provide inaccurate information. Verify critical facts.</p>
+          <p className="advisor-disclaimer">Learnbot AI may occasionally provide inaccurate information. Verify critical facts.</p>
+        </div>
       </section>
     </div>
   );
